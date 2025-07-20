@@ -24,7 +24,6 @@ import (
 	"github.com/goravel/framework/translation"
 	"github.com/goravel/framework/validation"
 	"github.com/goravel/gin"
-	"github.com/goravel/postgres"
 
 	"goravel/app/providers"
 )
@@ -93,7 +92,6 @@ func init() {
 		"providers": []foundation.ServiceProvider{
 			&log.ServiceProvider{},
 			&console.ServiceProvider{},
-			&postgres.ServiceProvider{},
 			&database.ServiceProvider{},
 			&cache.ServiceProvider{},
 			&http.ServiceProvider{},
