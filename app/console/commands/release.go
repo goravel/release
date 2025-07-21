@@ -710,6 +710,7 @@ func (r *Release) releaseMajorSuccess(ctx console.Context, frameworkTag, package
 	color.Black().Println(fmt.Sprintf("2. Set goravel/example %s as default branch: https://github.com/goravel/example/settings", frameworkTag))
 	color.Black().Println("3. Install the new version via goravel/installer and test the project works fine")
 	color.Black().Println("4. Merge the upgrade document PR (this step will be automated in the future): https://github.com/goravel/docs/pulls")
+	color.Black().Println("5. Switch the default branch if there are repositories that specify another branch as default branch")
 }
 
 func (r *Release) releaseSuccess(repo, tagName string) {
