@@ -614,6 +614,11 @@ func (r *Release) releaseMajor(ctx console.Context) error {
 		}
 	}
 
+	goravelReleaseInfo, err := r.getPackageReleaseInformation(ctx, "goravel", frameworkTag)
+	if err != nil {
+		return err
+	}
+
 	frameworkReleaseInfo, err := r.getFrameworkReleaseInformation(ctx, frameworkTag)
 	if err != nil {
 		return err
@@ -625,7 +630,7 @@ func (r *Release) releaseMajor(ctx console.Context) error {
 	}
 
 	if !ctx.Confirm("Did you confirm the release information?") {
-		releaseInfos := append(packagesReleaseInfo, frameworkReleaseInfo)
+		releaseInfos := append(packagesReleaseInfo, goravelReleaseInfo, frameworkReleaseInfo)
 		if err := r.confirmReleaseInformations(ctx, releaseInfos); err != nil {
 			return err
 		}
@@ -673,6 +678,10 @@ func (r *Release) releaseMajor(ctx console.Context) error {
 		return fmt.Errorf("failed to check upgrade PRs merge status: %w", err)
 	}
 
+	if err := r.releaseRepo(ctx, goravelReleaseInfo); err != nil {
+		return err
+	}
+
 	if strings.HasSuffix(frameworkTag, ".0") {
 		frameworkMajorTag := strings.TrimSuffix(frameworkTag, ".0") + ".x"
 		if err := r.pushBranch(ctx, "framework", frameworkMajorTag); err != nil {
@@ -701,6 +710,7 @@ func (r *Release) releaseMajorSuccess(ctx console.Context, frameworkTag, package
 	color.Black().Println(fmt.Sprintf("2. Set goravel/example %s as default branch: https://github.com/goravel/example/settings", frameworkTag))
 	color.Black().Println("3. Install the new version via goravel/installer and test the project works fine")
 	color.Black().Println("4. Merge the upgrade document PR (this step will be automated in the future): https://github.com/goravel/docs/pulls")
+	color.Black().Println("5. Switch the default branch if there are repositories that specify another branch as default branch")
 }
 
 func (r *Release) releaseSuccess(repo, tagName string) {
