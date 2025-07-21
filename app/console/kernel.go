@@ -1,10 +1,10 @@
 package console
 
 import (
-	"goravel/app/console/commands"
-
 	"github.com/goravel/framework/contracts/console"
 	"github.com/goravel/framework/contracts/schedule"
+
+	"goravel/app/console/commands"
 )
 
 type Kernel struct {

@@ -852,7 +852,7 @@ go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.
 	}
 }
 
-func (s *ReleaseTestSuite) Test_getFrameworkReleaseInfomration() {
+func (s *ReleaseTestSuite) Test_getFrameworkReleaseInformation() {
 	tests := []struct {
 		name    string
 		tag     string
@@ -865,7 +865,7 @@ func (s *ReleaseTestSuite) Test_getFrameworkReleaseInfomration() {
 			tag:  "v1.16.0",
 			setup: func() {
 				// Mock spinner success
-				s.mockContext.EXPECT().Spinner("Getting framework release infomration for v1.16.0...", mock.AnythingOfType("console.SpinnerOption")).
+				s.mockContext.EXPECT().Spinner("Getting framework release information for v1.16.0...", mock.AnythingOfType("console.SpinnerOption")).
 					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
 						return opts.Action()
 					}).Once()
@@ -914,7 +914,7 @@ const (
 			name: "spinner fails",
 			tag:  "v1.16.0",
 			setup: func() {
-				s.mockContext.EXPECT().Spinner("Getting framework release infomration for v1.16.0...", mock.AnythingOfType("console.SpinnerOption")).
+				s.mockContext.EXPECT().Spinner("Getting framework release information for v1.16.0...", mock.AnythingOfType("console.SpinnerOption")).
 					Return(assert.AnError).Once()
 			},
 			want:    nil,
@@ -924,7 +924,7 @@ const (
 			name: "getLatestTag fails",
 			tag:  "v1.16.0",
 			setup: func() {
-				s.mockContext.EXPECT().Spinner("Getting framework release infomration for v1.16.0...", mock.AnythingOfType("console.SpinnerOption")).
+				s.mockContext.EXPECT().Spinner("Getting framework release information for v1.16.0...", mock.AnythingOfType("console.SpinnerOption")).
 					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
 						return opts.Action()
 					}).Once()
@@ -938,7 +938,7 @@ const (
 			name: "getFrameworkCurrentTag fails",
 			tag:  "v1.16.0",
 			setup: func() {
-				s.mockContext.EXPECT().Spinner("Getting framework release infomration for v1.16.0...", mock.AnythingOfType("console.SpinnerOption")).
+				s.mockContext.EXPECT().Spinner("Getting framework release information for v1.16.0...", mock.AnythingOfType("console.SpinnerOption")).
 					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
 						return opts.Action()
 					}).Once()
@@ -957,7 +957,7 @@ const (
 			name: "generateReleaseNotes fails",
 			tag:  "v1.16.0",
 			setup: func() {
-				s.mockContext.EXPECT().Spinner("Getting framework release infomration for v1.16.0...", mock.AnythingOfType("console.SpinnerOption")).
+				s.mockContext.EXPECT().Spinner("Getting framework release information for v1.16.0...", mock.AnythingOfType("console.SpinnerOption")).
 					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
 						return opts.Action()
 					}).Once()
@@ -990,7 +990,7 @@ const (
 		s.Run(tt.name, func() {
 			tt.setup()
 
-			result, err := s.release.getFrameworkReleaseInfomration(s.mockContext, tt.tag)
+			result, err := s.release.getFrameworkReleaseInformation(s.mockContext, tt.tag)
 
 			s.Equal(tt.want, result)
 			s.Equal(tt.wantErr, err)
@@ -998,7 +998,7 @@ const (
 	}
 }
 
-func (s *ReleaseTestSuite) Test_getPackagesReleaseInfomration() {
+func (s *ReleaseTestSuite) Test_getPackagesReleaseInformation() {
 	tests := []struct {
 		name    string
 		tag     string
@@ -1012,7 +1012,7 @@ func (s *ReleaseTestSuite) Test_getPackagesReleaseInfomration() {
 			setup: func() {
 				// Mock successful retrieval for all packages
 				for _, pkg := range packages {
-					s.mockContext.EXPECT().Spinner(fmt.Sprintf("Getting %s release infomration for v1.4.0...", pkg), mock.AnythingOfType("console.SpinnerOption")).
+					s.mockContext.EXPECT().Spinner(fmt.Sprintf("Getting %s release information for v1.4.0...", pkg), mock.AnythingOfType("console.SpinnerOption")).
 						RunAndReturn(func(msg string, opts console.SpinnerOption) error {
 							return opts.Action()
 						}).Once()
@@ -1058,7 +1058,7 @@ func (s *ReleaseTestSuite) Test_getPackagesReleaseInfomration() {
 			tag:  "v1.4.0",
 			setup: func() {
 				// Mock spinner for first package
-				s.mockContext.EXPECT().Spinner("Getting gin release infomration for v1.4.0...", mock.AnythingOfType("console.SpinnerOption")).
+				s.mockContext.EXPECT().Spinner("Getting gin release information for v1.4.0...", mock.AnythingOfType("console.SpinnerOption")).
 					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
 						return opts.Action()
 					}).Once()
@@ -1074,7 +1074,7 @@ func (s *ReleaseTestSuite) Test_getPackagesReleaseInfomration() {
 			tag:  "v1.4.0",
 			setup: func() {
 				// Mock successful retrieval for first package (gin)
-				s.mockContext.EXPECT().Spinner("Getting gin release infomration for v1.4.0...", mock.AnythingOfType("console.SpinnerOption")).
+				s.mockContext.EXPECT().Spinner("Getting gin release information for v1.4.0...", mock.AnythingOfType("console.SpinnerOption")).
 					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
 						return opts.Action()
 					}).Once()
@@ -1093,7 +1093,7 @@ func (s *ReleaseTestSuite) Test_getPackagesReleaseInfomration() {
 				}, nil).Once()
 
 				// Mock spinner for second package (fiber) - this will fail
-				s.mockContext.EXPECT().Spinner("Getting fiber release infomration for v1.4.0...", mock.AnythingOfType("console.SpinnerOption")).
+				s.mockContext.EXPECT().Spinner("Getting fiber release information for v1.4.0...", mock.AnythingOfType("console.SpinnerOption")).
 					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
 						return opts.Action()
 					}).Once()
@@ -1115,7 +1115,7 @@ func (s *ReleaseTestSuite) Test_getPackagesReleaseInfomration() {
 			name: "spinner fails for first package",
 			tag:  "v1.4.0",
 			setup: func() {
-				s.mockContext.EXPECT().Spinner("Getting gin release infomration for v1.4.0...", mock.AnythingOfType("console.SpinnerOption")).
+				s.mockContext.EXPECT().Spinner("Getting gin release information for v1.4.0...", mock.AnythingOfType("console.SpinnerOption")).
 					Return(assert.AnError).Once()
 			},
 			want:    nil,
@@ -1126,7 +1126,7 @@ func (s *ReleaseTestSuite) Test_getPackagesReleaseInfomration() {
 			tag:  "v1.4.0",
 			setup: func() {
 				// Mock for first package only since we're testing early termination
-				s.mockContext.EXPECT().Spinner("Getting gin release infomration for v1.4.0...", mock.AnythingOfType("console.SpinnerOption")).
+				s.mockContext.EXPECT().Spinner("Getting gin release information for v1.4.0...", mock.AnythingOfType("console.SpinnerOption")).
 					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
 						return opts.Action()
 					}).Once()
@@ -1144,7 +1144,7 @@ func (s *ReleaseTestSuite) Test_getPackagesReleaseInfomration() {
 				}, nil).Once()
 
 				// Mock for second package to complete the test
-				s.mockContext.EXPECT().Spinner("Getting fiber release infomration for v1.4.0...", mock.AnythingOfType("console.SpinnerOption")).
+				s.mockContext.EXPECT().Spinner("Getting fiber release information for v1.4.0...", mock.AnythingOfType("console.SpinnerOption")).
 					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
 						return opts.Action()
 					}).Once()
@@ -1164,7 +1164,7 @@ func (s *ReleaseTestSuite) Test_getPackagesReleaseInfomration() {
 
 				// Mock for remaining packages to complete the test
 				for _, pkg := range packages[2:] {
-					s.mockContext.EXPECT().Spinner(fmt.Sprintf("Getting %s release infomration for v1.4.0...", pkg), mock.AnythingOfType("console.SpinnerOption")).
+					s.mockContext.EXPECT().Spinner(fmt.Sprintf("Getting %s release information for v1.4.0...", pkg), mock.AnythingOfType("console.SpinnerOption")).
 						RunAndReturn(func(msg string, opts console.SpinnerOption) error {
 							return opts.Action()
 						}).Once()
@@ -1230,7 +1230,7 @@ func (s *ReleaseTestSuite) Test_getPackagesReleaseInfomration() {
 		s.Run(tt.name, func() {
 			tt.setup()
 
-			result, err := s.release.getPackagesReleaseInfomration(s.mockContext, tt.tag)
+			result, err := s.release.getPackagesReleaseInformation(s.mockContext, tt.tag)
 
 			s.Equal(tt.want, result)
 			s.Equal(tt.wantErr, err)

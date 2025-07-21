@@ -394,10 +394,10 @@ func (r *Release) executeCommand(command string) (string, error) {
 	return r.process.Run(command)
 }
 
-func (r *Release) getFrameworkReleaseInfomration(ctx console.Context, tag string) (*ReleaseInformation, error) {
+func (r *Release) getFrameworkReleaseInformation(ctx console.Context, tag string) (*ReleaseInformation, error) {
 	var releaseInformation *ReleaseInformation
 
-	if err := ctx.Spinner(fmt.Sprintf("Getting framework release infomration for %s...", tag), console.SpinnerOption{
+	if err := ctx.Spinner(fmt.Sprintf("Getting framework release information for %s...", tag), console.SpinnerOption{
 		Action: func() error {
 			latestTag, err := r.getLatestTag("framework")
 			if err != nil {
@@ -431,11 +431,11 @@ func (r *Release) getFrameworkReleaseInfomration(ctx console.Context, tag string
 	return releaseInformation, nil
 }
 
-func (r *Release) getPackagesReleaseInfomration(ctx console.Context, tag string) ([]*ReleaseInformation, error) {
+func (r *Release) getPackagesReleaseInformation(ctx console.Context, tag string) ([]*ReleaseInformation, error) {
 	releaseInfos := make([]*ReleaseInformation, 0)
 
 	for _, pkg := range packages {
-		releaseInfo, err := r.getPackageReleaseInfomration(ctx, pkg, tag)
+		releaseInfo, err := r.getPackageReleaseInformation(ctx, pkg, tag)
 		if err != nil {
 			return nil, err
 		}
@@ -446,10 +446,10 @@ func (r *Release) getPackagesReleaseInfomration(ctx console.Context, tag string)
 	return releaseInfos, nil
 }
 
-func (r *Release) getPackageReleaseInfomration(ctx console.Context, repo string, tag string) (*ReleaseInformation, error) {
+func (r *Release) getPackageReleaseInformation(ctx console.Context, repo string, tag string) (*ReleaseInformation, error) {
 	var releaseInformation *ReleaseInformation
 
-	if err := ctx.Spinner(fmt.Sprintf("Getting %s release infomration for %s...", repo, tag), console.SpinnerOption{
+	if err := ctx.Spinner(fmt.Sprintf("Getting %s release information for %s...", repo, tag), console.SpinnerOption{
 		Action: func() error {
 			latestTag, err := r.getLatestTag(repo)
 			if err != nil {
@@ -614,17 +614,17 @@ func (r *Release) releaseMajor(ctx console.Context) error {
 		}
 	}
 
-	frameworkReleaseInfo, err := r.getFrameworkReleaseInfomration(ctx, frameworkTag)
+	frameworkReleaseInfo, err := r.getFrameworkReleaseInformation(ctx, frameworkTag)
 	if err != nil {
 		return err
 	}
 
-	packagesReleaseInfo, err := r.getPackagesReleaseInfomration(ctx, packageTag)
+	packagesReleaseInfo, err := r.getPackagesReleaseInformation(ctx, packageTag)
 	if err != nil {
 		return err
 	}
 
-	if !ctx.Confirm("Did you confirm the release infomration?") {
+	if !ctx.Confirm("Did you confirm the release information?") {
 		releaseInfos := append(packagesReleaseInfo, frameworkReleaseInfo)
 		if err := r.confirmReleaseInformations(ctx, releaseInfos); err != nil {
 			return err
