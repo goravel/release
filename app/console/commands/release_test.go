@@ -472,11 +472,9 @@ func (s *ReleaseTestSuite) Test_createUpgradePR() {
 			real: false,
 			setup: func() {
 				s.mockContext.EXPECT().Spinner("Creating upgrade PR for example...", mock.AnythingOfType("console.SpinnerOption")).
-					Run(func(msg string, opts console.SpinnerOption) {
-						if opts.Action != nil {
-							opts.Action()
-						}
-					}).Return(nil).Once()
+					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
+						return opts.Action()
+					}).Once()
 				// Mock the cleanup call in defer
 				s.mockProcess.EXPECT().Run("rm -rf example").Return("", nil).Once()
 			},
@@ -1700,11 +1698,9 @@ func (s *ReleaseTestSuite) Test_pushBranch() {
 			real: false,
 			setup: func() {
 				s.mockContext.EXPECT().Spinner("Pushing branch v1.16.x for framework...", mock.AnythingOfType("console.SpinnerOption")).
-					Run(func(msg string, opts console.SpinnerOption) {
-						if opts.Action != nil {
-							opts.Action()
-						}
-					}).Return(nil).Once()
+					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
+						return opts.Action()
+					}).Once()
 				// Mock the cleanup call in defer
 				s.mockProcess.EXPECT().Run("rm -rf framework").Return("", nil).Once()
 			},

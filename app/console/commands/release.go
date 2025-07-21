@@ -141,7 +141,7 @@ func (r *Release) checkPRsMergeStatus(ctx console.Context, repoToPR map[string]*
 					continue
 				}
 
-				ctx.Spinner(fmt.Sprintf("Checking %s/%s merge status...", owner, repo), console.SpinnerOption{
+				if err := ctx.Spinner(fmt.Sprintf("Checking %s/%s merge status...", owner, repo), console.SpinnerOption{
 					Action: func() error {
 						merged, err := r.checkPRMergeStatus(repo, pr)
 						if err != nil {
@@ -158,7 +158,9 @@ func (r *Release) checkPRsMergeStatus(ctx console.Context, repoToPR map[string]*
 
 						return nil
 					},
-				})
+				}); err != nil {
+					return err
+				}
 			}
 
 			if len(notMerged) == 0 {
@@ -292,7 +294,7 @@ func (r *Release) createUpgradePRsForPackages(ctx console.Context, frameworkTag 
 
 func (r *Release) createUpgradePR(ctx console.Context, repo, frameworkTag string, dependencies []string) (*github.PullRequest, error) {
 	defer func() {
-		r.process.Run(fmt.Sprintf("rm -rf %s", repo))
+		_, _ = r.process.Run(fmt.Sprintf("rm -rf %s", repo))
 	}()
 
 	var pr *github.PullRequest
@@ -552,7 +554,7 @@ func (r *Release) isReleaseExist(repo string, tag string) (bool, error) {
 
 func (r *Release) pushBranch(ctx console.Context, repo, branch string) error {
 	defer func() {
-		r.process.Run(fmt.Sprintf("rm -rf %s", repo))
+		_, _ = r.process.Run(fmt.Sprintf("rm -rf %s", repo))
 	}()
 
 	if err := ctx.Spinner(fmt.Sprintf("Pushing branch %s for %s...", branch, repo), console.SpinnerOption{
@@ -708,7 +710,7 @@ func (r *Release) releaseSuccess(repo, tagName string) {
 
 func (r *Release) testInExample(ctx console.Context) error {
 	defer func() {
-		r.process.Run("rm -rf example")
+		_, _ = r.process.Run("rm -rf example")
 	}()
 
 	if err := ctx.Spinner("Testing in example...", console.SpinnerOption{
