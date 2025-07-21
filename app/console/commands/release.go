@@ -614,6 +614,11 @@ func (r *Release) releaseMajor(ctx console.Context) error {
 		}
 	}
 
+	goravelReleaseInfo, err := r.getPackageReleaseInformation(ctx, "goravel", frameworkTag)
+	if err != nil {
+		return err
+	}
+
 	frameworkReleaseInfo, err := r.getFrameworkReleaseInformation(ctx, frameworkTag)
 	if err != nil {
 		return err
@@ -625,7 +630,7 @@ func (r *Release) releaseMajor(ctx console.Context) error {
 	}
 
 	if !ctx.Confirm("Did you confirm the release information?") {
-		releaseInfos := append(packagesReleaseInfo, frameworkReleaseInfo)
+		releaseInfos := append(packagesReleaseInfo, goravelReleaseInfo, frameworkReleaseInfo)
 		if err := r.confirmReleaseInformations(ctx, releaseInfos); err != nil {
 			return err
 		}
@@ -671,6 +676,10 @@ func (r *Release) releaseMajor(ctx console.Context) error {
 		"goravel":        goravelPR,
 	}); err != nil {
 		return fmt.Errorf("failed to check upgrade PRs merge status: %w", err)
+	}
+
+	if err := r.releaseRepo(ctx, goravelReleaseInfo); err != nil {
+		return err
 	}
 
 	if strings.HasSuffix(frameworkTag, ".0") {
