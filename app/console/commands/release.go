@@ -3,7 +3,6 @@ package commands
 import (
 	"context"
 	"fmt"
-	"goravel/app/services"
 	"io"
 	"log"
 	"os/exec"
@@ -18,6 +17,8 @@ import (
 	"github.com/goravel/framework/facades"
 	"github.com/goravel/framework/support/color"
 	"github.com/goravel/framework/support/convert"
+
+	"goravel/app/services"
 )
 
 const owner = "goravel"
@@ -34,6 +35,7 @@ var packages = []string{
 	"sqlserver",
 	"sqlite",
 	"redis",
+	"installer",
 }
 
 type ReleaseInformation struct {
@@ -591,7 +593,7 @@ func (r *Release) releaseRepo(ctx console.Context, releaseInfo *ReleaseInformati
 		return fmt.Errorf("failed to create release: %w", err)
 	}
 
-	r.releaseSuccess(ctx, releaseInfo.repo, releaseInfo.tag)
+	r.releaseSuccess(releaseInfo.repo, releaseInfo.tag)
 
 	return nil
 }
@@ -699,7 +701,7 @@ func (r *Release) releaseMajorSuccess(ctx console.Context, frameworkTag, package
 	color.Black().Println("4. Merge the upgrade document PR (this step will be automated in the future): https://github.com/goravel/docs/pulls")
 }
 
-func (r *Release) releaseSuccess(ctx console.Context, repo, tagName string) {
+func (r *Release) releaseSuccess(repo, tagName string) {
 	color.Green().Println(fmt.Sprintf("[%s/%s] release %s success!", owner, repo, tagName))
 	color.Green().Println(fmt.Sprintf("Release link: https://github.com/%s/%s/releases/tag/%s", owner, repo, tagName))
 }

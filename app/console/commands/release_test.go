@@ -96,7 +96,7 @@ func (s *ReleaseTestSuite) Test_checkPRMergeStatus() {
 				s.mockGithub.EXPECT().GetPullRequest(owner, repo, *pr.Number).Return(&github.PullRequest{
 					Number:  convert.Pointer(1),
 					HTMLURL: convert.Pointer("https://github.com/goravel/gin/pull/1"),
-					State:   convert.Pointer("merged"),
+					Merged:  convert.Pointer(true),
 				}, nil).Once()
 			},
 			wantResult: true,
@@ -109,7 +109,7 @@ func (s *ReleaseTestSuite) Test_checkPRMergeStatus() {
 				s.mockGithub.EXPECT().GetPullRequest(owner, repo, *pr.Number).Return(&github.PullRequest{
 					Number:  convert.Pointer(1),
 					HTMLURL: convert.Pointer("https://github.com/goravel/gin/pull/1"),
-					State:   convert.Pointer("open"),
+					Merged:  convert.Pointer(false),
 				}, nil).Once()
 			},
 			wantResult: false,
@@ -134,9 +134,15 @@ func (s *ReleaseTestSuite) Test_checkPRsMergeStatus() {
 	var (
 		repo1 = "gin"
 		repo2 = "fiber"
+		repo3 = "example"
 		pr1   = &github.PullRequest{
 			Number:  convert.Pointer(1),
 			HTMLURL: convert.Pointer("https://github.com/goravel/gin/pull/1"),
+			State:   convert.Pointer("open"),
+		}
+		pr2 = &github.PullRequest{
+			Number:  convert.Pointer(2),
+			HTMLURL: convert.Pointer("https://github.com/goravel/fiber/pull/2"),
 			State:   convert.Pointer("open"),
 		}
 		repoToPR map[string]*github.PullRequest
@@ -145,7 +151,8 @@ func (s *ReleaseTestSuite) Test_checkPRsMergeStatus() {
 	beforeEach := func() {
 		repoToPR = map[string]*github.PullRequest{
 			repo1: pr1,
-			repo2: nil,
+			repo2: pr2,
+			repo3: nil, // No PR needed for this repo
 		}
 	}
 
@@ -155,7 +162,7 @@ func (s *ReleaseTestSuite) Test_checkPRsMergeStatus() {
 		wantErr error
 	}{
 		{
-			name: "failed to choice",
+			name: "choice fails on first attempt",
 			setup: func() {
 				s.mockContext.EXPECT().Choice("Check PRs merge status?", []console.Choice{
 					{
@@ -167,7 +174,7 @@ func (s *ReleaseTestSuite) Test_checkPRsMergeStatus() {
 			wantErr: assert.AnError,
 		},
 		{
-			name: "choice is not check",
+			name: "user chooses not to check initially, then choice fails",
 			setup: func() {
 				s.mockContext.EXPECT().Choice("Check PRs merge status?", []console.Choice{
 					{
@@ -185,50 +192,144 @@ func (s *ReleaseTestSuite) Test_checkPRsMergeStatus() {
 			wantErr: assert.AnError,
 		},
 		{
-			name: "failed to check PR merge status",
+			name: "all PRs merged in first iteration",
 			setup: func() {
+				// First choice - user chooses to check
 				s.mockContext.EXPECT().Choice("Check PRs merge status?", []console.Choice{
 					{
 						Key:   "Check",
 						Value: "Check",
 					},
 				}).Return("Check", nil).Once()
-				s.mockGithub.EXPECT().GetPullRequest(owner, repo1, *pr1.Number).Return(nil, assert.AnError).Once()
-			},
-			wantErr: assert.AnError,
-		},
-		{
-			name: "pr is merged",
-			setup: func() {
-				s.mockContext.EXPECT().Choice("Check PRs merge status?", []console.Choice{
-					{
-						Key:   "Check",
-						Value: "Check",
-					},
-				}).Return("Check", nil).Once()
+
+				// Check gin PR - merged
+				s.mockContext.EXPECT().Spinner("Checking goravel/gin merge status...", mock.AnythingOfType("console.SpinnerOption")).
+					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
+						return opts.Action()
+					}).Once()
 				s.mockGithub.EXPECT().GetPullRequest(owner, repo1, *pr1.Number).
 					Return(&github.PullRequest{
 						Number:  convert.Pointer(1),
 						HTMLURL: convert.Pointer("https://github.com/goravel/gin/pull/1"),
-						State:   convert.Pointer("merged"),
+						Merged:  convert.Pointer(true),
+					}, nil).Once()
+
+				// Check fiber PR - merged
+				s.mockContext.EXPECT().Spinner("Checking goravel/fiber merge status...", mock.AnythingOfType("console.SpinnerOption")).
+					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
+						return opts.Action()
+					}).Once()
+				s.mockGithub.EXPECT().GetPullRequest(owner, repo2, *pr2.Number).
+					Return(&github.PullRequest{
+						Number:  convert.Pointer(2),
+						HTMLURL: convert.Pointer("https://github.com/goravel/fiber/pull/2"),
+						Merged:  convert.Pointer(true),
 					}, nil).Once()
 			},
+			wantErr: nil,
 		},
 		{
-			name: "pr is not merged",
+			name: "some PRs not merged, then all merged in second iteration",
 			setup: func() {
+				// First choice - user chooses to check
 				s.mockContext.EXPECT().Choice("Check PRs merge status?", []console.Choice{
 					{
 						Key:   "Check",
 						Value: "Check",
 					},
 				}).Return("Check", nil).Once()
+
+				// Check gin PR - not merged
+				s.mockContext.EXPECT().Spinner("Checking goravel/gin merge status...", mock.AnythingOfType("console.SpinnerOption")).
+					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
+						return opts.Action()
+					}).Once()
 				s.mockGithub.EXPECT().GetPullRequest(owner, repo1, *pr1.Number).
 					Return(&github.PullRequest{
 						Number:  convert.Pointer(1),
 						HTMLURL: convert.Pointer("https://github.com/goravel/gin/pull/1"),
-						State:   convert.Pointer("open"),
+						Merged:  convert.Pointer(false),
 					}, nil).Once()
+
+				// Check fiber PR - merged
+				s.mockContext.EXPECT().Spinner("Checking goravel/fiber merge status...", mock.AnythingOfType("console.SpinnerOption")).
+					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
+						return opts.Action()
+					}).Once()
+				s.mockGithub.EXPECT().GetPullRequest(owner, repo2, *pr2.Number).
+					Return(&github.PullRequest{
+						Number:  convert.Pointer(2),
+						HTMLURL: convert.Pointer("https://github.com/goravel/fiber/pull/2"),
+						Merged:  convert.Pointer(true),
+					}, nil).Once()
+
+				// Second choice - user chooses to check again
+				s.mockContext.EXPECT().Choice("Check PRs merge status?", []console.Choice{
+					{
+						Key:   "Check",
+						Value: "Check",
+					},
+				}).Return("Check", nil).Once()
+
+				// Check gin PR again - now merged
+				s.mockContext.EXPECT().Spinner("Checking goravel/gin merge status...", mock.AnythingOfType("console.SpinnerOption")).
+					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
+						return opts.Action()
+					}).Once()
+				s.mockGithub.EXPECT().GetPullRequest(owner, repo1, *pr1.Number).
+					Return(&github.PullRequest{
+						Number:  convert.Pointer(1),
+						HTMLURL: convert.Pointer("https://github.com/goravel/gin/pull/1"),
+						Merged:  convert.Pointer(true),
+					}, nil).Once()
+			},
+			wantErr: nil,
+		},
+
+		{
+			name: "user chooses not to check after seeing not merged PRs",
+			setup: func() {
+				// First choice - user chooses to check
+				s.mockContext.EXPECT().Choice("Check PRs merge status?", []console.Choice{
+					{
+						Key:   "Check",
+						Value: "Check",
+					},
+				}).Return("Check", nil).Once()
+
+				// Check gin PR - not merged
+				s.mockContext.EXPECT().Spinner("Checking goravel/gin merge status...", mock.AnythingOfType("console.SpinnerOption")).
+					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
+						return opts.Action()
+					}).Once()
+				s.mockGithub.EXPECT().GetPullRequest(owner, repo1, *pr1.Number).
+					Return(&github.PullRequest{
+						Number:  convert.Pointer(1),
+						HTMLURL: convert.Pointer("https://github.com/goravel/gin/pull/1"),
+						Merged:  convert.Pointer(false),
+					}, nil).Once()
+
+				// Check fiber PR - not merged
+				s.mockContext.EXPECT().Spinner("Checking goravel/fiber merge status...", mock.AnythingOfType("console.SpinnerOption")).
+					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
+						return opts.Action()
+					}).Once()
+				s.mockGithub.EXPECT().GetPullRequest(owner, repo2, *pr2.Number).
+					Return(&github.PullRequest{
+						Number:  convert.Pointer(2),
+						HTMLURL: convert.Pointer("https://github.com/goravel/fiber/pull/2"),
+						Merged:  convert.Pointer(false),
+					}, nil).Once()
+
+				// Second choice - user chooses not to check
+				s.mockContext.EXPECT().Choice("Check PRs merge status?", []console.Choice{
+					{
+						Key:   "Check",
+						Value: "Check",
+					},
+				}).Return("Not Check", nil).Once()
+
+				// Third choice - user choice fails
 				s.mockContext.EXPECT().Choice("Check PRs merge status?", []console.Choice{
 					{
 						Key:   "Check",
@@ -237,6 +338,43 @@ func (s *ReleaseTestSuite) Test_checkPRsMergeStatus() {
 				}).Return("", assert.AnError).Once()
 			},
 			wantErr: assert.AnError,
+		},
+		{
+			name: "mixed scenario with nil PRs",
+			setup: func() {
+				// First choice - user chooses to check
+				s.mockContext.EXPECT().Choice("Check PRs merge status?", []console.Choice{
+					{
+						Key:   "Check",
+						Value: "Check",
+					},
+				}).Return("Check", nil).Once()
+
+				// Check gin PR - merged
+				s.mockContext.EXPECT().Spinner("Checking goravel/gin merge status...", mock.AnythingOfType("console.SpinnerOption")).
+					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
+						return opts.Action()
+					}).Once()
+				s.mockGithub.EXPECT().GetPullRequest(owner, repo1, *pr1.Number).
+					Return(&github.PullRequest{
+						Number:  convert.Pointer(1),
+						HTMLURL: convert.Pointer("https://github.com/goravel/gin/pull/1"),
+						Merged:  convert.Pointer(true),
+					}, nil).Once()
+
+				// Check fiber PR - merged
+				s.mockContext.EXPECT().Spinner("Checking goravel/fiber merge status...", mock.AnythingOfType("console.SpinnerOption")).
+					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
+						return opts.Action()
+					}).Once()
+				s.mockGithub.EXPECT().GetPullRequest(owner, repo2, *pr2.Number).
+					Return(&github.PullRequest{
+						Number:  convert.Pointer(2),
+						HTMLURL: convert.Pointer("https://github.com/goravel/fiber/pull/2"),
+						Merged:  convert.Pointer(true),
+					}, nil).Once()
+			},
+			wantErr: nil,
 		},
 	}
 
@@ -251,454 +389,6 @@ func (s *ReleaseTestSuite) Test_checkPRsMergeStatus() {
 		})
 	}
 }
-
-// func (s *ReleaseTestSuite) Test_confirmReleaseMajor() {
-// 	var (
-// 		frameworkTag = "v1.16.0"
-// 		packageTag   = "v1.16.0"
-// 	)
-
-// 	tests := []struct {
-// 		name            string
-// 		frameworkTag    string
-// 		packageTag      string
-// 		real            bool
-// 		setup           func()
-// 		wantRepoToNotes map[string]*github.RepositoryReleaseNotes
-// 		wantErr         error
-// 	}{
-// 		{
-// 			name:         "successful confirmation for all repositories - non-real mode",
-// 			frameworkTag: frameworkTag,
-// 			packageTag:   packageTag,
-// 			real:         false,
-// 			setup: func() {
-// 				// Mock framework release information
-// 				s.mockContext.EXPECT().TwoColumnDetail("", "", '-').Once()
-// 				s.mockContext.EXPECT().NewLine().Times(2) // divider, before notes
-
-// 				// Mock getLatestTag for framework
-// 				mockFrameworkRelease := &github.RepositoryRelease{
-// 					TagName: convert.Pointer("v1.15.0"),
-// 					Name:    convert.Pointer("Release v1.15.0"),
-// 					Body:    convert.Pointer("Previous release"),
-// 				}
-// 				s.mockGithub.EXPECT().GetLatestRelease(owner, "framework").Return(mockFrameworkRelease, nil).Once()
-
-// 				// Mock getFrameworkCurrentTag
-// 				mockResponse := mocksclient.NewResponse(s.T())
-// 				mockResponse.EXPECT().Body().Return(`package support
-
-// const (
-// 	Version = "v1.16.0"
-// 	// other constants...
-// )`, nil)
-// 				s.mockHttp.EXPECT().Get("https://raw.githubusercontent.com/goravel/framework/refs/heads/master/support/constant.go").
-// 					Return(mockResponse, nil).Once()
-
-// 				// Mock generateReleaseNotes for framework
-// 				frameworkNotes := &github.RepositoryReleaseNotes{
-// 					Name: "Release v1.16.0",
-// 					Body: "## What's Changed\n* Feature A\n* Bug fix B\n\n**Full Changelog**: https://github.com/goravel/framework/compare/v1.15.0...v1.16.0",
-// 				}
-// 				s.mockGithub.EXPECT().GenerateReleaseNotes(owner, "framework", &github.GenerateNotesOptions{
-// 					TagName:         "v1.16.0",
-// 					PreviousTagName: convert.Pointer("v1.15.0"),
-// 					TargetCommitish: convert.Pointer("master"),
-// 				}).Return(frameworkNotes, nil).Once()
-
-// 				// Mock framework confirmation
-// 				s.mockContext.EXPECT().NewLine().Once()
-// 				s.mockContext.EXPECT().Confirm("goravel/framework confirmed?").Return(true).Once()
-
-// 				// Mock gin package release information
-// 				s.mockContext.EXPECT().TwoColumnDetail("", "", '-').Once()
-// 				s.mockContext.EXPECT().NewLine().Once() // divider
-
-// 				// Mock getLatestTag for gin
-// 				mockGinRelease := &github.RepositoryRelease{
-// 					TagName: convert.Pointer("v1.15.0"),
-// 					Name:    convert.Pointer("Release v1.15.0"),
-// 					Body:    convert.Pointer("Previous release"),
-// 				}
-// 				s.mockGithub.EXPECT().GetLatestRelease(owner, "gin").Return(mockGinRelease, nil).Once()
-
-// 				// Mock generateReleaseNotes for gin
-// 				ginNotes := &github.RepositoryReleaseNotes{
-// 					Name: "Release v1.16.0",
-// 					Body: "## What's Changed\n* Feature A\n* Bug fix B\n\n**Full Changelog**: https://github.com/goravel/gin/compare/v1.15.0...v1.16.0",
-// 				}
-// 				s.mockGithub.EXPECT().GenerateReleaseNotes(owner, "gin", &github.GenerateNotesOptions{
-// 					TagName:         "v1.16.0",
-// 					PreviousTagName: convert.Pointer("v1.15.0"),
-// 					TargetCommitish: convert.Pointer("master"),
-// 				}).Return(ginNotes, nil).Once()
-
-// 				// Mock gin confirmation
-// 				s.mockContext.EXPECT().NewLine().Once()
-// 				s.mockContext.EXPECT().Confirm("goravel/gin confirmed?").Return(true).Once()
-
-// 				// Mock fiber package release information
-// 				s.mockContext.EXPECT().TwoColumnDetail("", "", '-').Once()
-// 				s.mockContext.EXPECT().NewLine().Once() // divider
-
-// 				// Mock getLatestTag for fiber
-// 				mockFiberRelease := &github.RepositoryRelease{
-// 					TagName: convert.Pointer("v1.15.0"),
-// 					Name:    convert.Pointer("Release v1.15.0"),
-// 					Body:    convert.Pointer("Previous release"),
-// 				}
-// 				s.mockGithub.EXPECT().GetLatestRelease(owner, "fiber").Return(mockFiberRelease, nil).Once()
-
-// 				// Mock generateReleaseNotes for fiber
-// 				fiberNotes := &github.RepositoryReleaseNotes{
-// 					Name: "Release v1.16.0",
-// 					Body: "## What's Changed\n* Feature A\n* Bug fix B\n\n**Full Changelog**: https://github.com/goravel/fiber/compare/v1.15.0...v1.16.0",
-// 				}
-// 				s.mockGithub.EXPECT().GenerateReleaseNotes(owner, "fiber", &github.GenerateNotesOptions{
-// 					TagName:         "v1.16.0",
-// 					PreviousTagName: convert.Pointer("v1.15.0"),
-// 					TargetCommitish: convert.Pointer("master"),
-// 				}).Return(fiberNotes, nil).Once()
-
-// 				// Mock fiber confirmation
-// 				s.mockContext.EXPECT().NewLine().Once()
-// 				s.mockContext.EXPECT().Confirm("goravel/fiber confirmed?").Return(true).Once()
-// 			},
-// 			wantRepoToNotes: map[string]*github.RepositoryReleaseNotes{
-// 				"framework": {
-// 					Name: "Release v1.16.0",
-// 					Body: "## What's Changed\n* Feature A\n* Bug fix B\n\n**Full Changelog**: https://github.com/goravel/framework/compare/v1.15.0...v1.16.0",
-// 				},
-// 				"gin": {
-// 					Name: "Release v1.16.0",
-// 					Body: "## What's Changed\n* Feature A\n* Bug fix B\n\n**Full Changelog**: https://github.com/goravel/gin/compare/v1.15.0...v1.16.0",
-// 				},
-// 				"fiber": {
-// 					Name: "Release v1.16.0",
-// 					Body: "## What's Changed\n* Feature A\n* Bug fix B\n\n**Full Changelog**: https://github.com/goravel/fiber/compare/v1.15.0...v1.16.0",
-// 				},
-// 			},
-// 			wantErr: nil,
-// 		},
-// 		{
-// 			name:         "successful confirmation for all repositories - real mode",
-// 			frameworkTag: frameworkTag,
-// 			packageTag:   packageTag,
-// 			real:         true,
-// 			setup: func() {
-// 				// Mock framework release information (no confirmations in real mode)
-// 				s.mockContext.EXPECT().TwoColumnDetail("", "", '-').Once()
-// 				s.mockContext.EXPECT().NewLine().Times(2) // divider, before notes
-
-// 				// Mock getLatestTag for framework
-// 				mockFrameworkRelease := &github.RepositoryRelease{
-// 					TagName: convert.Pointer("v1.15.0"),
-// 					Name:    convert.Pointer("Release v1.15.0"),
-// 					Body:    convert.Pointer("Previous release"),
-// 				}
-// 				s.mockGithub.EXPECT().GetLatestRelease(owner, "framework").Return(mockFrameworkRelease, nil).Once()
-
-// 				// Mock getFrameworkCurrentTag
-// 				mockResponse := mocksclient.NewResponse(s.T())
-// 				mockResponse.EXPECT().Body().Return(`package support
-
-// const (
-// 	Version = "v1.16.0"
-// 	// other constants...
-// )`, nil)
-// 				s.mockHttp.EXPECT().Get("https://raw.githubusercontent.com/goravel/framework/refs/heads/master/support/constant.go").
-// 					Return(mockResponse, nil).Once()
-
-// 				// Mock generateReleaseNotes for framework
-// 				frameworkNotes := &github.RepositoryReleaseNotes{
-// 					Name: "Release v1.16.0",
-// 					Body: "## What's Changed\n* Feature A\n* Bug fix B\n\n**Full Changelog**: https://github.com/goravel/framework/compare/v1.15.0...v1.16.0",
-// 				}
-// 				s.mockGithub.EXPECT().GenerateReleaseNotes(owner, "framework", &github.GenerateNotesOptions{
-// 					TagName:         "v1.16.0",
-// 					PreviousTagName: convert.Pointer("v1.15.0"),
-// 					TargetCommitish: convert.Pointer("master"),
-// 				}).Return(frameworkNotes, nil).Once()
-
-// 				// Mock NewLine after framework (in real mode)
-// 				s.mockContext.EXPECT().NewLine().Once()
-
-// 				// Mock gin package release information
-// 				s.mockContext.EXPECT().TwoColumnDetail("", "", '-').Once()
-// 				s.mockContext.EXPECT().NewLine().Once() // divider
-
-// 				// Mock getLatestTag for gin
-// 				mockGinRelease := &github.RepositoryRelease{
-// 					TagName: convert.Pointer("v1.15.0"),
-// 					Name:    convert.Pointer("Release v1.15.0"),
-// 					Body:    convert.Pointer("Previous release"),
-// 				}
-// 				s.mockGithub.EXPECT().GetLatestRelease(owner, "gin").Return(mockGinRelease, nil).Once()
-
-// 				// Mock generateReleaseNotes for gin
-// 				ginNotes := &github.RepositoryReleaseNotes{
-// 					Name: "Release v1.16.0",
-// 					Body: "## What's Changed\n* Feature A\n* Bug fix B\n\n**Full Changelog**: https://github.com/goravel/gin/compare/v1.15.0...v1.16.0",
-// 				}
-// 				s.mockGithub.EXPECT().GenerateReleaseNotes(owner, "gin", &github.GenerateNotesOptions{
-// 					TagName:         "v1.16.0",
-// 					PreviousTagName: convert.Pointer("v1.15.0"),
-// 					TargetCommitish: convert.Pointer("master"),
-// 				}).Return(ginNotes, nil).Once()
-
-// 				// Mock NewLine after gin (in real mode)
-// 				s.mockContext.EXPECT().NewLine().Once()
-
-// 				// Mock fiber package release information
-// 				s.mockContext.EXPECT().TwoColumnDetail("", "", '-').Once()
-// 				s.mockContext.EXPECT().NewLine().Once() // divider
-
-// 				// Mock getLatestTag for fiber
-// 				mockFiberRelease := &github.RepositoryRelease{
-// 					TagName: convert.Pointer("v1.15.0"),
-// 					Name:    convert.Pointer("Release v1.15.0"),
-// 					Body:    convert.Pointer("Previous release"),
-// 				}
-// 				s.mockGithub.EXPECT().GetLatestRelease(owner, "fiber").Return(mockFiberRelease, nil).Once()
-
-// 				// Mock generateReleaseNotes for fiber
-// 				fiberNotes := &github.RepositoryReleaseNotes{
-// 					Name: "Release v1.16.0",
-// 					Body: "## What's Changed\n* Feature A\n* Bug fix B\n\n**Full Changelog**: https://github.com/goravel/fiber/compare/v1.15.0...v1.16.0",
-// 				}
-// 				s.mockGithub.EXPECT().GenerateReleaseNotes(owner, "fiber", &github.GenerateNotesOptions{
-// 					TagName:         "v1.16.0",
-// 					PreviousTagName: convert.Pointer("v1.15.0"),
-// 					TargetCommitish: convert.Pointer("master"),
-// 				}).Return(fiberNotes, nil).Once()
-
-// 				// Mock NewLine after fiber (in real mode)
-// 				s.mockContext.EXPECT().NewLine().Once()
-// 			},
-// 			wantRepoToNotes: map[string]*github.RepositoryReleaseNotes{
-// 				"framework": {
-// 					Name: "Release v1.16.0",
-// 					Body: "## What's Changed\n* Feature A\n* Bug fix B\n\n**Full Changelog**: https://github.com/goravel/framework/compare/v1.15.0...v1.16.0",
-// 				},
-// 				"gin": {
-// 					Name: "Release v1.16.0",
-// 					Body: "## What's Changed\n* Feature A\n* Bug fix B\n\n**Full Changelog**: https://github.com/goravel/gin/compare/v1.15.0...v1.16.0",
-// 				},
-// 				"fiber": {
-// 					Name: "Release v1.16.0",
-// 					Body: "## What's Changed\n* Feature A\n* Bug fix B\n\n**Full Changelog**: https://github.com/goravel/fiber/compare/v1.15.0...v1.16.0",
-// 				},
-// 			},
-// 			wantErr: nil,
-// 		},
-// 		{
-// 			name:         "framework getLatestTag fails",
-// 			frameworkTag: frameworkTag,
-// 			packageTag:   packageTag,
-// 			real:         false,
-// 			setup: func() {
-// 				// Mock framework release information
-// 				s.mockContext.EXPECT().TwoColumnDetail("", "", '-').Once()
-// 				s.mockContext.EXPECT().NewLine().Once()
-
-// 				// Mock getLatestTag for framework fails
-// 				s.mockGithub.EXPECT().GetLatestRelease(owner, "framework").Return(nil, assert.AnError).Once()
-// 			},
-// 			wantRepoToNotes: nil,
-// 			wantErr:         fmt.Errorf("failed to get latest tag: %w", assert.AnError),
-// 		},
-// 		{
-// 			name:         "framework confirmation rejected",
-// 			frameworkTag: frameworkTag,
-// 			packageTag:   packageTag,
-// 			real:         false,
-// 			setup: func() {
-// 				// Mock framework release information
-// 				s.mockContext.EXPECT().TwoColumnDetail("", "", '-').Once()
-// 				s.mockContext.EXPECT().NewLine().Times(2) // divider, before notes
-
-// 				// Mock getLatestTag for framework
-// 				mockFrameworkRelease := &github.RepositoryRelease{
-// 					TagName: convert.Pointer("v1.15.0"),
-// 					Name:    convert.Pointer("Release v1.15.0"),
-// 					Body:    convert.Pointer("Previous release"),
-// 				}
-// 				s.mockGithub.EXPECT().GetLatestRelease(owner, "framework").Return(mockFrameworkRelease, nil).Once()
-
-// 				// Mock getFrameworkCurrentTag
-// 				mockResponse := mocksclient.NewResponse(s.T())
-// 				mockResponse.EXPECT().Body().Return(`package support
-
-// 		const (
-// 			Version = "v1.16.0"
-// 			// other constants...
-// 		)`, nil)
-// 				s.mockHttp.EXPECT().Get("https://raw.githubusercontent.com/goravel/framework/refs/heads/master/support/constant.go").
-// 					Return(mockResponse, nil).Once()
-
-// 				// Mock generateReleaseNotes for framework
-// 				frameworkNotes := &github.RepositoryReleaseNotes{
-// 					Name: "Release v1.16.0",
-// 					Body: "## What's Changed\n* Feature A\n* Bug fix B\n\n**Full Changelog**: https://github.com/goravel/framework/compare/v1.15.0...v1.16.0",
-// 				}
-// 				s.mockGithub.EXPECT().GenerateReleaseNotes(owner, "framework", &github.GenerateNotesOptions{
-// 					TagName:         "v1.16.0",
-// 					PreviousTagName: convert.Pointer("v1.15.0"),
-// 					TargetCommitish: convert.Pointer("master"),
-// 				}).Return(frameworkNotes, nil).Once()
-
-// 				// Mock framework confirmation rejected
-// 				s.mockContext.EXPECT().NewLine().Once()
-// 				s.mockContext.EXPECT().Confirm("goravel/framework confirmed?").Return(false).Once()
-// 			},
-// 			wantRepoToNotes: nil,
-// 			wantErr:         fmt.Errorf("goravel/framework not confirmed"),
-// 		},
-// 		{
-// 			name:         "gin package getLatestTag fails",
-// 			frameworkTag: frameworkTag,
-// 			packageTag:   packageTag,
-// 			real:         false,
-// 			setup: func() {
-// 				// Mock framework release information
-// 				s.mockContext.EXPECT().TwoColumnDetail("", "", '-').Once()
-// 				s.mockContext.EXPECT().NewLine().Times(2) // divider, before notes
-
-// 				// Mock getLatestTag for framework
-// 				mockFrameworkRelease := &github.RepositoryRelease{
-// 					TagName: convert.Pointer("v1.15.0"),
-// 					Name:    convert.Pointer("Release v1.15.0"),
-// 					Body:    convert.Pointer("Previous release"),
-// 				}
-// 				s.mockGithub.EXPECT().GetLatestRelease(owner, "framework").Return(mockFrameworkRelease, nil).Once()
-
-// 				// Mock getFrameworkCurrentTag
-// 				mockResponse := mocksclient.NewResponse(s.T())
-// 				mockResponse.EXPECT().Body().Return(`package support
-
-// 		const (
-// 			Version = "v1.16.0"
-// 			// other constants...
-// 		)`, nil)
-// 				s.mockHttp.EXPECT().Get("https://raw.githubusercontent.com/goravel/framework/refs/heads/master/support/constant.go").
-// 					Return(mockResponse, nil).Once()
-
-// 				// Mock generateReleaseNotes for framework
-// 				frameworkNotes := &github.RepositoryReleaseNotes{
-// 					Name: "Release v1.16.0",
-// 					Body: "## What's Changed\n* Feature A\n* Bug fix B\n\n**Full Changelog**: https://github.com/goravel/framework/compare/v1.15.0...v1.16.0",
-// 				}
-// 				s.mockGithub.EXPECT().GenerateReleaseNotes(owner, "framework", &github.GenerateNotesOptions{
-// 					TagName:         "v1.16.0",
-// 					PreviousTagName: convert.Pointer("v1.15.0"),
-// 					TargetCommitish: convert.Pointer("master"),
-// 				}).Return(frameworkNotes, nil).Once()
-
-// 				// Mock framework confirmation
-// 				s.mockContext.EXPECT().NewLine().Once()
-// 				s.mockContext.EXPECT().Confirm("goravel/framework confirmed?").Return(true).Once()
-
-// 				// Mock gin package release information
-// 				s.mockContext.EXPECT().TwoColumnDetail("", "", '-').Once()
-// 				s.mockContext.EXPECT().NewLine().Once() // divider
-
-// 				// Mock getLatestTag for gin fails
-// 				s.mockGithub.EXPECT().GetLatestRelease(owner, "gin").Return(nil, assert.AnError).Once()
-// 			},
-// 			wantRepoToNotes: nil,
-// 			wantErr:         fmt.Errorf("failed to get and print gin release infomration: %w", fmt.Errorf("failed to get latest tag for goravel/gin: %w", assert.AnError)),
-// 		},
-// 		{
-// 			name:         "gin package confirmation rejected",
-// 			frameworkTag: frameworkTag,
-// 			packageTag:   packageTag,
-// 			real:         false,
-// 			setup: func() {
-// 				// Mock framework release information
-// 				s.mockContext.EXPECT().TwoColumnDetail("", "", '-').Once()
-// 				s.mockContext.EXPECT().NewLine().Times(2) // divider, before notes
-
-// 				// Mock getLatestTag for framework
-// 				mockFrameworkRelease := &github.RepositoryRelease{
-// 					TagName: convert.Pointer("v1.15.0"),
-// 					Name:    convert.Pointer("Release v1.15.0"),
-// 					Body:    convert.Pointer("Previous release"),
-// 				}
-// 				s.mockGithub.EXPECT().GetLatestRelease(owner, "framework").Return(mockFrameworkRelease, nil).Once()
-
-// 				// Mock getFrameworkCurrentTag
-// 				mockResponse := mocksclient.NewResponse(s.T())
-// 				mockResponse.EXPECT().Body().Return(`package support
-
-// 		const (
-// 			Version = "v1.16.0"
-// 			// other constants...
-// 		)`, nil)
-// 				s.mockHttp.EXPECT().Get("https://raw.githubusercontent.com/goravel/framework/refs/heads/master/support/constant.go").
-// 					Return(mockResponse, nil).Once()
-
-// 				// Mock generateReleaseNotes for framework
-// 				frameworkNotes := &github.RepositoryReleaseNotes{
-// 					Name: "Release v1.16.0",
-// 					Body: "## What's Changed\n* Feature A\n* Bug fix B\n\n**Full Changelog**: https://github.com/goravel/framework/compare/v1.15.0...v1.16.0",
-// 				}
-// 				s.mockGithub.EXPECT().GenerateReleaseNotes(owner, "framework", &github.GenerateNotesOptions{
-// 					TagName:         "v1.16.0",
-// 					PreviousTagName: convert.Pointer("v1.15.0"),
-// 					TargetCommitish: convert.Pointer("master"),
-// 				}).Return(frameworkNotes, nil).Once()
-
-// 				// Mock framework confirmation
-// 				s.mockContext.EXPECT().NewLine().Once()
-// 				s.mockContext.EXPECT().Confirm("goravel/framework confirmed?").Return(true).Once()
-
-// 				// Mock gin package release information
-// 				s.mockContext.EXPECT().TwoColumnDetail("", "", '-').Once()
-// 				s.mockContext.EXPECT().NewLine().Once() // divider
-
-// 				// Mock getLatestTag for gin
-// 				mockGinRelease := &github.RepositoryRelease{
-// 					TagName: convert.Pointer("v1.15.0"),
-// 					Name:    convert.Pointer("Release v1.15.0"),
-// 					Body:    convert.Pointer("Previous release"),
-// 				}
-// 				s.mockGithub.EXPECT().GetLatestRelease(owner, "gin").Return(mockGinRelease, nil).Once()
-
-// 				// Mock generateReleaseNotes for gin
-// 				ginNotes := &github.RepositoryReleaseNotes{
-// 					Name: "Release v1.16.0",
-// 					Body: "## What's Changed\n* Feature A\n* Bug fix B\n\n**Full Changelog**: https://github.com/goravel/gin/compare/v1.15.0...v1.16.0",
-// 				}
-// 				s.mockGithub.EXPECT().GenerateReleaseNotes(owner, "gin", &github.GenerateNotesOptions{
-// 					TagName:         "v1.16.0",
-// 					PreviousTagName: convert.Pointer("v1.15.0"),
-// 					TargetCommitish: convert.Pointer("master"),
-// 				}).Return(ginNotes, nil).Once()
-
-// 				// Mock NewLine after gin package notes (before confirmation)
-// 				s.mockContext.EXPECT().NewLine().Once()
-
-// 				// Mock gin confirmation rejected
-// 				s.mockContext.EXPECT().Confirm("goravel/gin confirmed?").Return(false).Once()
-// 			},
-// 			wantRepoToNotes: nil,
-// 			wantErr:         fmt.Errorf("goravel/gin not confirmed"),
-// 		},
-// 	}
-
-// 	for _, tt := range tests {
-// 		s.Run(tt.name, func() {
-// 			s.release.real = tt.real
-// 			tt.setup()
-
-// 			repoToNotes, err := s.release.confirmReleaseMajor(s.mockContext, tt.frameworkTag, tt.packageTag)
-
-// 			s.Equal(tt.wantRepoToNotes, repoToNotes)
-// 			s.Equal(tt.wantErr, err)
-// 		})
-// 	}
-// }
 
 func (s *ReleaseTestSuite) Test_createRelease() {
 	var (
@@ -818,7 +508,7 @@ func (s *ReleaseTestSuite) Test_createUpgradePR() {
 					}).Once()
 
 				// Mock the first process.Run call (clone and mod) to fail
-				s.mockProcess.EXPECT().Run(`rm -rf example && git clone --depth=1 git@github.com:goravel/example.git &&
+				s.mockProcess.EXPECT().Run(`rm -rf example && git clone git@github.com:goravel/example.git &&
 cd example && git checkout master && git branch -D auto-upgrade/v1.16.0 2>/dev/null || true && git checkout -b auto-upgrade/v1.16.0 &&
 go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.4.0 && go mod tidy`).
 					Return("", assert.AnError).Once()
@@ -839,7 +529,7 @@ go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.
 					}).Once()
 
 				// Mock successful clone and mod
-				s.mockProcess.EXPECT().Run(`rm -rf example && git clone --depth=1 git@github.com:goravel/example.git &&
+				s.mockProcess.EXPECT().Run(`rm -rf example && git clone git@github.com:goravel/example.git &&
 cd example && git checkout master && git branch -D auto-upgrade/v1.16.0 2>/dev/null || true && git checkout -b auto-upgrade/v1.16.0 &&
 go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.4.0 && go mod tidy`).
 					Return("success", nil).Once()
@@ -863,7 +553,7 @@ go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.
 					}).Once()
 
 				// Mock successful clone and mod
-				s.mockProcess.EXPECT().Run(`rm -rf example && git clone --depth=1 git@github.com:goravel/example.git &&
+				s.mockProcess.EXPECT().Run(`rm -rf example && git clone git@github.com:goravel/example.git &&
 cd example && git checkout master && git branch -D auto-upgrade/v1.16.0 2>/dev/null || true && git checkout -b auto-upgrade/v1.16.0 &&
 go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.4.0 && go mod tidy`).
 					Return("success", nil).Once()
@@ -887,7 +577,7 @@ go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.
 					}).Once()
 
 				// Mock successful clone and mod
-				s.mockProcess.EXPECT().Run(`rm -rf example && git clone --depth=1 git@github.com:goravel/example.git &&
+				s.mockProcess.EXPECT().Run(`rm -rf example && git clone git@github.com:goravel/example.git &&
 cd example && git checkout master && git branch -D auto-upgrade/v1.16.0 2>/dev/null || true && git checkout -b auto-upgrade/v1.16.0 &&
 go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.4.0 && go mod tidy`).
 					Return("success", nil).Once()
@@ -915,7 +605,7 @@ go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.
 					}).Once()
 
 				// Mock successful clone and mod
-				s.mockProcess.EXPECT().Run(`rm -rf example && git clone --depth=1 git@github.com:goravel/example.git &&
+				s.mockProcess.EXPECT().Run(`rm -rf example && git clone git@github.com:goravel/example.git &&
 cd example && git checkout master && git branch -D auto-upgrade/v1.16.0 2>/dev/null || true && git checkout -b auto-upgrade/v1.16.0 &&
 go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.4.0 && go mod tidy`).
 					Return("success", nil).Once()
@@ -943,7 +633,7 @@ go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.
 					}).Once()
 
 				// Mock successful clone and mod
-				s.mockProcess.EXPECT().Run(`rm -rf example && git clone --depth=1 git@github.com:goravel/example.git &&
+				s.mockProcess.EXPECT().Run(`rm -rf example && git clone git@github.com:goravel/example.git &&
 cd example && git checkout master && git branch -D auto-upgrade/v1.16.0 2>/dev/null || true && git checkout -b auto-upgrade/v1.16.0 &&
 go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.4.0 && go mod tidy`).
 					Return("success", nil).Once()
@@ -976,7 +666,7 @@ go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.
 					}).Once()
 
 				// Mock successful clone and mod
-				s.mockProcess.EXPECT().Run(`rm -rf example && git clone --depth=1 git@github.com:goravel/example.git &&
+				s.mockProcess.EXPECT().Run(`rm -rf example && git clone git@github.com:goravel/example.git &&
 cd example && git checkout master && git branch -D auto-upgrade/v1.16.0 2>/dev/null || true && git checkout -b auto-upgrade/v1.16.0 &&
 go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.4.0 && go mod tidy`).
 					Return("success", nil).Once()
@@ -1021,7 +711,7 @@ go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.
 					}).Once()
 
 				// Mock successful clone and mod
-				s.mockProcess.EXPECT().Run(`rm -rf example && git clone --depth=1 git@github.com:goravel/example.git &&
+				s.mockProcess.EXPECT().Run(`rm -rf example && git clone git@github.com:goravel/example.git &&
 cd example && git checkout master && git branch -D auto-upgrade/v1.16.0 2>/dev/null || true && git checkout -b auto-upgrade/v1.16.0 &&
 go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.4.0 && go mod tidy`).
 					Return("success", nil).Once()
@@ -1061,7 +751,7 @@ go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.
 					}).Once()
 
 				// Mock successful clone and mod
-				s.mockProcess.EXPECT().Run(`rm -rf example && git clone --depth=1 git@github.com:goravel/example.git &&
+				s.mockProcess.EXPECT().Run(`rm -rf example && git clone git@github.com:goravel/example.git &&
 cd example && git checkout master && git branch -D auto-upgrade/v1.16.0 2>/dev/null || true && git checkout -b auto-upgrade/v1.16.0 &&
 go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.4.0 && go mod tidy`).
 					Return("success", nil).Once()
@@ -1110,7 +800,7 @@ go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.
 					}).Once()
 
 				// Mock successful clone and mod
-				s.mockProcess.EXPECT().Run(`rm -rf example && git clone --depth=1 git@github.com:goravel/example.git &&
+				s.mockProcess.EXPECT().Run(`rm -rf example && git clone git@github.com:goravel/example.git &&
 cd example && git checkout master && git branch -D auto-upgrade/v1.16.0 2>/dev/null || true && git checkout -b auto-upgrade/v1.16.0 &&
 go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.4.0 && go mod tidy`).
 					Return("success", nil).Once()
@@ -1159,6 +849,392 @@ go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.
 			pr, err := s.release.createUpgradePR(s.mockContext, repo, frameworkTag, dependencies)
 
 			s.Equal(tt.wantPR, pr)
+			s.Equal(tt.wantErr, err)
+		})
+	}
+}
+
+func (s *ReleaseTestSuite) Test_getFrameworkReleaseInfomration() {
+	tests := []struct {
+		name    string
+		tag     string
+		setup   func()
+		want    *ReleaseInformation
+		wantErr error
+	}{
+		{
+			name: "successful release information retrieval",
+			tag:  "v1.16.0",
+			setup: func() {
+				// Mock spinner success
+				s.mockContext.EXPECT().Spinner("Getting framework release infomration for v1.16.0...", mock.AnythingOfType("console.SpinnerOption")).
+					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
+						return opts.Action()
+					}).Once()
+
+				// Mock getLatestTag success
+				s.mockGithub.EXPECT().GetLatestRelease(owner, "framework").Return(&github.RepositoryRelease{
+					TagName: convert.Pointer("v1.15.0"),
+					Name:    convert.Pointer("Release v1.15.0"),
+				}, nil).Once()
+
+				// Mock getFrameworkCurrentTag success
+				mockResponse := mocksclient.NewResponse(s.T())
+				mockResponse.On("Body").Return(`package support
+
+const (
+	Version = "v1.16.0"
+	// other constants...
+)`, nil)
+				s.mockHttp.EXPECT().Get("https://raw.githubusercontent.com/goravel/framework/refs/heads/master/support/constant.go").
+					Return(mockResponse, nil).Once()
+
+				// Mock generateReleaseNotes success
+				expectedNotes := &github.RepositoryReleaseNotes{
+					Name: "Release v1.16.0",
+					Body: "## What's Changed\n* Feature A\n* Bug fix B\n\n**Full Changelog**: https://github.com/goravel/framework/compare/v1.15.0...v1.16.0",
+				}
+				s.mockGithub.EXPECT().GenerateReleaseNotes(owner, "framework", &github.GenerateNotesOptions{
+					TagName:         "v1.16.0",
+					PreviousTagName: convert.Pointer("v1.15.0"),
+					TargetCommitish: convert.Pointer("master"),
+				}).Return(expectedNotes, nil).Once()
+			},
+			want: &ReleaseInformation{
+				currentTag: "v1.16.0",
+				latestTag:  "v1.15.0",
+				notes: &github.RepositoryReleaseNotes{
+					Name: "Release v1.16.0",
+					Body: "## What's Changed\n* Feature A\n* Bug fix B\n\n**Full Changelog**: https://github.com/goravel/framework/compare/v1.15.0...v1.16.0",
+				},
+				repo: "framework",
+				tag:  "v1.16.0",
+			},
+			wantErr: nil,
+		},
+		{
+			name: "spinner fails",
+			tag:  "v1.16.0",
+			setup: func() {
+				s.mockContext.EXPECT().Spinner("Getting framework release infomration for v1.16.0...", mock.AnythingOfType("console.SpinnerOption")).
+					Return(assert.AnError).Once()
+			},
+			want:    nil,
+			wantErr: assert.AnError,
+		},
+		{
+			name: "getLatestTag fails",
+			tag:  "v1.16.0",
+			setup: func() {
+				s.mockContext.EXPECT().Spinner("Getting framework release infomration for v1.16.0...", mock.AnythingOfType("console.SpinnerOption")).
+					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
+						return opts.Action()
+					}).Once()
+
+				s.mockGithub.EXPECT().GetLatestRelease(owner, "framework").Return(nil, assert.AnError).Once()
+			},
+			want:    nil,
+			wantErr: assert.AnError,
+		},
+		{
+			name: "getFrameworkCurrentTag fails",
+			tag:  "v1.16.0",
+			setup: func() {
+				s.mockContext.EXPECT().Spinner("Getting framework release infomration for v1.16.0...", mock.AnythingOfType("console.SpinnerOption")).
+					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
+						return opts.Action()
+					}).Once()
+
+				s.mockGithub.EXPECT().GetLatestRelease(owner, "framework").Return(&github.RepositoryRelease{
+					TagName: convert.Pointer("v1.15.0"),
+				}, nil).Once()
+
+				s.mockHttp.EXPECT().Get("https://raw.githubusercontent.com/goravel/framework/refs/heads/master/support/constant.go").
+					Return(nil, assert.AnError).Once()
+			},
+			want:    nil,
+			wantErr: assert.AnError,
+		},
+		{
+			name: "generateReleaseNotes fails",
+			tag:  "v1.16.0",
+			setup: func() {
+				s.mockContext.EXPECT().Spinner("Getting framework release infomration for v1.16.0...", mock.AnythingOfType("console.SpinnerOption")).
+					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
+						return opts.Action()
+					}).Once()
+
+				s.mockGithub.EXPECT().GetLatestRelease(owner, "framework").Return(&github.RepositoryRelease{
+					TagName: convert.Pointer("v1.15.0"),
+				}, nil).Once()
+
+				mockResponse := mocksclient.NewResponse(s.T())
+				mockResponse.On("Body").Return(`package support
+
+const (
+	Version = "v1.16.0"
+)`, nil)
+				s.mockHttp.EXPECT().Get("https://raw.githubusercontent.com/goravel/framework/refs/heads/master/support/constant.go").
+					Return(mockResponse, nil).Once()
+
+				s.mockGithub.EXPECT().GenerateReleaseNotes(owner, "framework", &github.GenerateNotesOptions{
+					TagName:         "v1.16.0",
+					PreviousTagName: convert.Pointer("v1.15.0"),
+					TargetCommitish: convert.Pointer("master"),
+				}).Return(nil, assert.AnError).Once()
+			},
+			want:    nil,
+			wantErr: assert.AnError,
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			tt.setup()
+
+			result, err := s.release.getFrameworkReleaseInfomration(s.mockContext, tt.tag)
+
+			s.Equal(tt.want, result)
+			s.Equal(tt.wantErr, err)
+		})
+	}
+}
+
+func (s *ReleaseTestSuite) Test_getPackagesReleaseInfomration() {
+	tests := []struct {
+		name    string
+		tag     string
+		setup   func()
+		want    []*ReleaseInformation
+		wantErr error
+	}{
+		{
+			name: "successful retrieval for all packages",
+			tag:  "v1.4.0",
+			setup: func() {
+				// Mock successful retrieval for all packages
+				for _, pkg := range packages {
+					s.mockContext.EXPECT().Spinner(fmt.Sprintf("Getting %s release infomration for v1.4.0...", pkg), mock.AnythingOfType("console.SpinnerOption")).
+						RunAndReturn(func(msg string, opts console.SpinnerOption) error {
+							return opts.Action()
+						}).Once()
+
+					// Mock getLatestTag success
+					s.mockGithub.EXPECT().GetLatestRelease(owner, pkg).Return(&github.RepositoryRelease{
+						TagName: convert.Pointer("v1.3.0"),
+						Name:    convert.Pointer(fmt.Sprintf("Release v1.3.0 for %s", pkg)),
+					}, nil).Once()
+
+					// Mock generateReleaseNotes success
+					expectedNotes := &github.RepositoryReleaseNotes{
+						Name: fmt.Sprintf("Release v1.4.0 for %s", pkg),
+						Body: fmt.Sprintf("## What's Changed\n* Feature A for %s\n* Bug fix B for %s\n\n**Full Changelog**: https://github.com/goravel/%s/compare/v1.3.0...v1.4.0", pkg, pkg, pkg),
+					}
+					s.mockGithub.EXPECT().GenerateReleaseNotes(owner, pkg, &github.GenerateNotesOptions{
+						TagName:         "v1.4.0",
+						PreviousTagName: convert.Pointer("v1.3.0"),
+						TargetCommitish: convert.Pointer("master"),
+					}).Return(expectedNotes, nil).Once()
+				}
+			},
+			want: func() []*ReleaseInformation {
+				var result []*ReleaseInformation
+				for _, pkg := range packages {
+					result = append(result, &ReleaseInformation{
+						currentTag: "",
+						latestTag:  "v1.3.0",
+						notes: &github.RepositoryReleaseNotes{
+							Name: fmt.Sprintf("Release v1.4.0 for %s", pkg),
+							Body: fmt.Sprintf("## What's Changed\n* Feature A for %s\n* Bug fix B for %s\n\n**Full Changelog**: https://github.com/goravel/%s/compare/v1.3.0...v1.4.0", pkg, pkg, pkg),
+						},
+						repo: pkg,
+						tag:  "v1.4.0",
+					})
+				}
+				return result
+			}(),
+			wantErr: nil,
+		},
+		{
+			name: "first package fails with getLatestTag error",
+			tag:  "v1.4.0",
+			setup: func() {
+				// Mock spinner for first package
+				s.mockContext.EXPECT().Spinner("Getting gin release infomration for v1.4.0...", mock.AnythingOfType("console.SpinnerOption")).
+					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
+						return opts.Action()
+					}).Once()
+
+				// Mock getLatestTag fails for first package
+				s.mockGithub.EXPECT().GetLatestRelease(owner, "gin").Return(nil, assert.AnError).Once()
+			},
+			want:    nil,
+			wantErr: assert.AnError,
+		},
+		{
+			name: "middle package fails with generateReleaseNotes error",
+			tag:  "v1.4.0",
+			setup: func() {
+				// Mock successful retrieval for first package (gin)
+				s.mockContext.EXPECT().Spinner("Getting gin release infomration for v1.4.0...", mock.AnythingOfType("console.SpinnerOption")).
+					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
+						return opts.Action()
+					}).Once()
+
+				s.mockGithub.EXPECT().GetLatestRelease(owner, "gin").Return(&github.RepositoryRelease{
+					TagName: convert.Pointer("v1.3.0"),
+				}, nil).Once()
+
+				s.mockGithub.EXPECT().GenerateReleaseNotes(owner, "gin", &github.GenerateNotesOptions{
+					TagName:         "v1.4.0",
+					PreviousTagName: convert.Pointer("v1.3.0"),
+					TargetCommitish: convert.Pointer("master"),
+				}).Return(&github.RepositoryReleaseNotes{
+					Name: "Release v1.4.0 for gin",
+					Body: "## What's Changed\n* Feature A for gin",
+				}, nil).Once()
+
+				// Mock spinner for second package (fiber) - this will fail
+				s.mockContext.EXPECT().Spinner("Getting fiber release infomration for v1.4.0...", mock.AnythingOfType("console.SpinnerOption")).
+					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
+						return opts.Action()
+					}).Once()
+
+				s.mockGithub.EXPECT().GetLatestRelease(owner, "fiber").Return(&github.RepositoryRelease{
+					TagName: convert.Pointer("v1.3.0"),
+				}, nil).Once()
+
+				s.mockGithub.EXPECT().GenerateReleaseNotes(owner, "fiber", &github.GenerateNotesOptions{
+					TagName:         "v1.4.0",
+					PreviousTagName: convert.Pointer("v1.3.0"),
+					TargetCommitish: convert.Pointer("master"),
+				}).Return(nil, assert.AnError).Once()
+			},
+			want:    nil,
+			wantErr: assert.AnError,
+		},
+		{
+			name: "spinner fails for first package",
+			tag:  "v1.4.0",
+			setup: func() {
+				s.mockContext.EXPECT().Spinner("Getting gin release infomration for v1.4.0...", mock.AnythingOfType("console.SpinnerOption")).
+					Return(assert.AnError).Once()
+			},
+			want:    nil,
+			wantErr: assert.AnError,
+		},
+		{
+			name: "getLatestTag returns nil release - should succeed with empty latestTag",
+			tag:  "v1.4.0",
+			setup: func() {
+				// Mock for first package only since we're testing early termination
+				s.mockContext.EXPECT().Spinner("Getting gin release infomration for v1.4.0...", mock.AnythingOfType("console.SpinnerOption")).
+					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
+						return opts.Action()
+					}).Once()
+
+				s.mockGithub.EXPECT().GetLatestRelease(owner, "gin").Return(nil, nil).Once()
+
+				// When latestTag is empty, generateReleaseNotes should still work
+				s.mockGithub.EXPECT().GenerateReleaseNotes(owner, "gin", &github.GenerateNotesOptions{
+					TagName:         "v1.4.0",
+					PreviousTagName: convert.Pointer(""),
+					TargetCommitish: convert.Pointer("master"),
+				}).Return(&github.RepositoryReleaseNotes{
+					Name: "Release v1.4.0 for gin",
+					Body: "## What's Changed\n* Feature A for gin",
+				}, nil).Once()
+
+				// Mock for second package to complete the test
+				s.mockContext.EXPECT().Spinner("Getting fiber release infomration for v1.4.0...", mock.AnythingOfType("console.SpinnerOption")).
+					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
+						return opts.Action()
+					}).Once()
+
+				s.mockGithub.EXPECT().GetLatestRelease(owner, "fiber").Return(&github.RepositoryRelease{
+					TagName: convert.Pointer("v1.3.0"),
+				}, nil).Once()
+
+				s.mockGithub.EXPECT().GenerateReleaseNotes(owner, "fiber", &github.GenerateNotesOptions{
+					TagName:         "v1.4.0",
+					PreviousTagName: convert.Pointer("v1.3.0"),
+					TargetCommitish: convert.Pointer("master"),
+				}).Return(&github.RepositoryReleaseNotes{
+					Name: "Release v1.4.0 for fiber",
+					Body: "## What's Changed\n* Feature A for fiber",
+				}, nil).Once()
+
+				// Mock for remaining packages to complete the test
+				for _, pkg := range packages[2:] {
+					s.mockContext.EXPECT().Spinner(fmt.Sprintf("Getting %s release infomration for v1.4.0...", pkg), mock.AnythingOfType("console.SpinnerOption")).
+						RunAndReturn(func(msg string, opts console.SpinnerOption) error {
+							return opts.Action()
+						}).Once()
+
+					s.mockGithub.EXPECT().GetLatestRelease(owner, pkg).Return(&github.RepositoryRelease{
+						TagName: convert.Pointer("v1.3.0"),
+					}, nil).Once()
+
+					s.mockGithub.EXPECT().GenerateReleaseNotes(owner, pkg, &github.GenerateNotesOptions{
+						TagName:         "v1.4.0",
+						PreviousTagName: convert.Pointer("v1.3.0"),
+						TargetCommitish: convert.Pointer("master"),
+					}).Return(&github.RepositoryReleaseNotes{
+						Name: fmt.Sprintf("Release v1.4.0 for %s", pkg),
+						Body: fmt.Sprintf("## What's Changed\n* Feature A for %s", pkg),
+					}, nil).Once()
+				}
+			},
+			want: func() []*ReleaseInformation {
+				var result []*ReleaseInformation
+				// First package with empty latestTag
+				result = append(result, &ReleaseInformation{
+					currentTag: "",
+					latestTag:  "",
+					notes: &github.RepositoryReleaseNotes{
+						Name: "Release v1.4.0 for gin",
+						Body: "## What's Changed\n* Feature A for gin",
+					},
+					repo: "gin",
+					tag:  "v1.4.0",
+				})
+				// Second package
+				result = append(result, &ReleaseInformation{
+					currentTag: "",
+					latestTag:  "v1.3.0",
+					notes: &github.RepositoryReleaseNotes{
+						Name: "Release v1.4.0 for fiber",
+						Body: "## What's Changed\n* Feature A for fiber",
+					},
+					repo: "fiber",
+					tag:  "v1.4.0",
+				})
+				// Remaining packages
+				for _, pkg := range packages[2:] {
+					result = append(result, &ReleaseInformation{
+						currentTag: "",
+						latestTag:  "v1.3.0",
+						notes: &github.RepositoryReleaseNotes{
+							Name: fmt.Sprintf("Release v1.4.0 for %s", pkg),
+							Body: fmt.Sprintf("## What's Changed\n* Feature A for %s", pkg),
+						},
+						repo: pkg,
+						tag:  "v1.4.0",
+					})
+				}
+				return result
+			}(),
+			wantErr: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			tt.setup()
+
+			result, err := s.release.getPackagesReleaseInfomration(s.mockContext, tt.tag)
+
+			s.Equal(tt.want, result)
 			s.Equal(tt.wantErr, err)
 		})
 	}
@@ -1423,7 +1499,6 @@ func (s *ReleaseTestSuite) Test_getLatestTag() {
 				s.mockGithub.EXPECT().GetLatestRelease(owner, "fiber").Return(nil, nil).Once()
 			},
 			wantTag: "",
-			wantErr: fmt.Errorf("latest release is nil for %s/fiber", owner),
 		},
 		{
 			name: "github API returns release with nil TagName",
@@ -1656,7 +1731,7 @@ func (s *ReleaseTestSuite) Test_pushBranch() {
 					}).Once()
 
 				// Mock the git command execution fails
-				expectedCommand := `rm -rf framework && git clone --depth=1 git@github.com:goravel/framework.git && 
+				expectedCommand := `rm -rf framework && git clone git@github.com:goravel/framework.git && 
 cd framework && git checkout master && git branch -D v1.16.x 2>/dev/null || true && git checkout -b v1.16.x && git push origin v1.16.x -f`
 				s.mockProcess.EXPECT().Run(expectedCommand).Return("", assert.AnError).Once()
 
@@ -1664,25 +1739,6 @@ cd framework && git checkout master && git branch -D v1.16.x 2>/dev/null || true
 				s.mockProcess.EXPECT().Run("rm -rf framework").Return("", nil).Once()
 			},
 			wantErr: fmt.Errorf("failed to push upgrade branch for framework: %w", assert.AnError),
-		},
-		{
-			name: "real mode - output doesn't contain branch name",
-			real: true,
-			setup: func() {
-				s.mockContext.EXPECT().Spinner("Pushing branch v1.16.x for framework...", mock.AnythingOfType("console.SpinnerOption")).
-					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
-						return opts.Action()
-					}).Once()
-
-				// Mock the git command execution succeeds but output doesn't contain branch name
-				expectedCommand := `rm -rf framework && git clone --depth=1 git@github.com:goravel/framework.git && 
-cd framework && git checkout master && git branch -D v1.16.x 2>/dev/null || true && git checkout -b v1.16.x && git push origin v1.16.x -f`
-				s.mockProcess.EXPECT().Run(expectedCommand).Return("pushed to remote", nil).Once()
-
-				// Mock the cleanup call in defer
-				s.mockProcess.EXPECT().Run("rm -rf framework").Return("", nil).Once()
-			},
-			wantErr: fmt.Errorf("failed to push branch for framework: pushed to remote"),
 		},
 		{
 			name: "real mode - successful push",
@@ -1694,7 +1750,7 @@ cd framework && git checkout master && git branch -D v1.16.x 2>/dev/null || true
 					}).Once()
 
 				// Mock the git command execution succeeds with output containing branch name
-				expectedCommand := `rm -rf framework && git clone --depth=1 git@github.com:goravel/framework.git && 
+				expectedCommand := `rm -rf framework && git clone git@github.com:goravel/framework.git && 
 cd framework && git checkout master && git branch -D v1.16.x 2>/dev/null || true && git checkout -b v1.16.x && git push origin v1.16.x -f`
 				s.mockProcess.EXPECT().Run(expectedCommand).Return("pushed v1.16.x to origin", nil).Once()
 
@@ -1713,7 +1769,7 @@ cd framework && git checkout master && git branch -D v1.16.x 2>/dev/null || true
 					}).Once()
 
 				// Mock the git command execution succeeds
-				expectedCommand := `rm -rf framework && git clone --depth=1 git@github.com:goravel/framework.git && 
+				expectedCommand := `rm -rf framework && git clone git@github.com:goravel/framework.git && 
 cd framework && git checkout master && git branch -D v1.16.x 2>/dev/null || true && git checkout -b v1.16.x && git push origin v1.16.x -f`
 				s.mockProcess.EXPECT().Run(expectedCommand).Return("pushed v1.16.x to origin", nil).Once()
 
@@ -1736,312 +1792,119 @@ cd framework && git checkout master && git branch -D v1.16.x 2>/dev/null || true
 	}
 }
 
-// func (s *ReleaseTestSuite) Test_releaseAllPackages() {
-// 	var (
-// 		packageTag  = "v1.16.0"
-// 		repoToNotes = map[string]*github.RepositoryReleaseNotes{
-// 			"gin": {
-// 				Name: "Release gin v1.16.0",
-// 				Body: "## What's Changed\n* Feature A\n* Bug fix B",
-// 			},
-// 			"fiber": {
-// 				Name: "Release fiber v1.16.0",
-// 				Body: "## What's Changed\n* Feature C\n* Bug fix D",
-// 			},
-// 		}
-// 	)
+func (s *ReleaseTestSuite) Test_releaseRepo() {
+	var (
+		repo  = "framework"
+		tag   = "v1.16.0"
+		notes = &github.RepositoryReleaseNotes{
+			Name: "Release v1.16.0",
+			Body: "## What's Changed\n* Feature A\n* Bug fix B",
+		}
+		releaseInfo = &ReleaseInformation{
+			currentTag: "v1.16.0",
+			latestTag:  "v1.15.0",
+			notes:      notes,
+			repo:       repo,
+			tag:        tag,
+		}
+	)
 
-// 	tests := []struct {
-// 		name        string
-// 		repoToNotes map[string]*github.RepositoryReleaseNotes
-// 		setup       func()
-// 		wantErr     error
-// 	}{
-// 		{
-// 			name:        "successful release of all packages",
-// 			repoToNotes: repoToNotes,
-// 			setup: func() {
-// 				// Mock releaseRepo for gin package
-// 				s.mockGithub.EXPECT().GetReleases(owner, "gin", &github.ListOptions{
-// 					Page:    1,
-// 					PerPage: 10,
-// 				}).Return([]*github.RepositoryRelease{
-// 					{
-// 						TagName: convert.Pointer("v1.15.0"),
-// 						Name:    convert.Pointer("Release gin v1.15.0"),
-// 					},
-// 				}, nil).Once()
+	tests := []struct {
+		name        string
+		releaseInfo *ReleaseInformation
+		setup       func()
+		wantErr     error
+	}{
+		{
+			name:        "release already exists",
+			releaseInfo: releaseInfo,
+			setup: func() {
+				s.mockGithub.EXPECT().GetReleases(owner, repo, &github.ListOptions{
+					Page:    1,
+					PerPage: 10,
+				}).Return([]*github.RepositoryRelease{
+					{
+						TagName: convert.Pointer("v1.15.0"),
+						Name:    convert.Pointer("Release v1.15.0"),
+					},
+					{
+						TagName: convert.Pointer("v1.16.0"),
+						Name:    convert.Pointer("Release v1.16.0"),
+					},
+				}, nil).Once()
+			},
+			wantErr: nil,
+		},
+		{
+			name:        "release does not exist, create release succeeds",
+			releaseInfo: releaseInfo,
+			setup: func() {
+				// Mock isReleaseExist returns false
+				s.mockGithub.EXPECT().GetReleases(owner, repo, &github.ListOptions{
+					Page:    1,
+					PerPage: 10,
+				}).Return([]*github.RepositoryRelease{
+					{
+						TagName: convert.Pointer("v1.15.0"),
+						Name:    convert.Pointer("Release v1.15.0"),
+					},
+				}, nil).Once()
 
-// 				s.mockGithub.EXPECT().CreateRelease(owner, "gin", &github.RepositoryRelease{
-// 					TagName:         convert.Pointer(packageTag),
-// 					TargetCommitish: convert.Pointer("master"),
-// 					Name:            convert.Pointer(repoToNotes["gin"].Name),
-// 					Body:            convert.Pointer(repoToNotes["gin"].Body),
-// 				}).Return(nil, nil).Once()
+				// Mock createRelease succeeds
+				s.mockGithub.EXPECT().CreateRelease(owner, repo, &github.RepositoryRelease{
+					TagName:         convert.Pointer(tag),
+					TargetCommitish: convert.Pointer("master"),
+					Name:            convert.Pointer(notes.Name),
+					Body:            convert.Pointer(notes.Body),
+				}).Return(nil, nil).Once()
+			},
+			wantErr: nil,
+		},
+		{
+			name:        "isReleaseExist fails",
+			releaseInfo: releaseInfo,
+			setup: func() {
+				s.mockGithub.EXPECT().GetReleases(owner, repo, &github.ListOptions{
+					Page:    1,
+					PerPage: 10,
+				}).Return(nil, assert.AnError).Once()
+			},
+			wantErr: assert.AnError,
+		},
+		{
+			name:        "createRelease fails",
+			releaseInfo: releaseInfo,
+			setup: func() {
+				// Mock isReleaseExist returns false
+				s.mockGithub.EXPECT().GetReleases(owner, repo, &github.ListOptions{
+					Page:    1,
+					PerPage: 10,
+				}).Return([]*github.RepositoryRelease{
+					{
+						TagName: convert.Pointer("v1.15.0"),
+						Name:    convert.Pointer("Release v1.15.0"),
+					},
+				}, nil).Once()
 
-// 				s.mockContext.EXPECT().NewLine().Once()
+				// Mock createRelease fails
+				s.mockGithub.EXPECT().CreateRelease(owner, repo, &github.RepositoryRelease{
+					TagName:         convert.Pointer(tag),
+					TargetCommitish: convert.Pointer("master"),
+					Name:            convert.Pointer(notes.Name),
+					Body:            convert.Pointer(notes.Body),
+				}).Return(nil, assert.AnError).Once()
+			},
+			wantErr: fmt.Errorf("failed to create release: %w", assert.AnError),
+		},
+	}
 
-// 				// Mock releaseRepo for fiber package
-// 				s.mockGithub.EXPECT().GetReleases(owner, "fiber", &github.ListOptions{
-// 					Page:    1,
-// 					PerPage: 10,
-// 				}).Return([]*github.RepositoryRelease{
-// 					{
-// 						TagName: convert.Pointer("v1.15.0"),
-// 						Name:    convert.Pointer("Release fiber v1.15.0"),
-// 					},
-// 				}, nil).Once()
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			tt.setup()
 
-// 				s.mockGithub.EXPECT().CreateRelease(owner, "fiber", &github.RepositoryRelease{
-// 					TagName:         convert.Pointer(packageTag),
-// 					TargetCommitish: convert.Pointer("master"),
-// 					Name:            convert.Pointer(repoToNotes["fiber"].Name),
-// 					Body:            convert.Pointer(repoToNotes["fiber"].Body),
-// 				}).Return(nil, nil).Once()
+			err := s.release.releaseRepo(s.mockContext, tt.releaseInfo)
 
-// 				s.mockContext.EXPECT().NewLine().Once()
-// 			},
-// 			wantErr: nil,
-// 		},
-// 		{
-// 			name: "missing notes for gin package",
-// 			repoToNotes: map[string]*github.RepositoryReleaseNotes{
-// 				"fiber": {
-// 					Name: "Release fiber v1.16.0",
-// 					Body: "## What's Changed\n* Feature C\n* Bug fix D",
-// 				},
-// 			},
-// 			setup:   func() {},
-// 			wantErr: fmt.Errorf("notes for gin not found"),
-// 		},
-// 		{
-// 			name:        "releaseRepo fails for gin package",
-// 			repoToNotes: repoToNotes,
-// 			setup: func() {
-// 				// Mock releaseRepo fails for gin package
-// 				s.mockGithub.EXPECT().GetReleases(owner, "gin", &github.ListOptions{
-// 					Page:    1,
-// 					PerPage: 10,
-// 				}).Return(nil, assert.AnError).Once()
-// 			},
-// 			wantErr: assert.AnError,
-// 		},
-// 		{
-// 			name:        "releaseRepo fails for fiber package after gin succeeds",
-// 			repoToNotes: repoToNotes,
-// 			setup: func() {
-// 				// Mock releaseRepo succeeds for gin package
-// 				s.mockGithub.EXPECT().GetReleases(owner, "gin", &github.ListOptions{
-// 					Page:    1,
-// 					PerPage: 10,
-// 				}).Return([]*github.RepositoryRelease{
-// 					{
-// 						TagName: convert.Pointer("v1.15.0"),
-// 						Name:    convert.Pointer("Release gin v1.15.0"),
-// 					},
-// 				}, nil).Once()
-
-// 				s.mockGithub.EXPECT().CreateRelease(owner, "gin", &github.RepositoryRelease{
-// 					TagName:         convert.Pointer(packageTag),
-// 					TargetCommitish: convert.Pointer("master"),
-// 					Name:            convert.Pointer(repoToNotes["gin"].Name),
-// 					Body:            convert.Pointer(repoToNotes["gin"].Body),
-// 				}).Return(nil, nil).Once()
-
-// 				s.mockContext.EXPECT().NewLine().Once()
-
-// 				// Mock releaseRepo fails for fiber package
-// 				s.mockGithub.EXPECT().GetReleases(owner, "fiber", &github.ListOptions{
-// 					Page:    1,
-// 					PerPage: 10,
-// 				}).Return(nil, assert.AnError).Once()
-// 			},
-// 			wantErr: assert.AnError,
-// 		},
-// 		{
-// 			name:        "createRelease fails for gin package",
-// 			repoToNotes: repoToNotes,
-// 			setup: func() {
-// 				// Mock isReleaseExist succeeds but createRelease fails for gin
-// 				s.mockGithub.EXPECT().GetReleases(owner, "gin", &github.ListOptions{
-// 					Page:    1,
-// 					PerPage: 10,
-// 				}).Return([]*github.RepositoryRelease{
-// 					{
-// 						TagName: convert.Pointer("v1.15.0"),
-// 						Name:    convert.Pointer("Release gin v1.15.0"),
-// 					},
-// 				}, nil).Once()
-
-// 				s.mockGithub.EXPECT().CreateRelease(owner, "gin", &github.RepositoryRelease{
-// 					TagName:         convert.Pointer(packageTag),
-// 					TargetCommitish: convert.Pointer("master"),
-// 					Name:            convert.Pointer(repoToNotes["gin"].Name),
-// 					Body:            convert.Pointer(repoToNotes["gin"].Body),
-// 				}).Return(nil, assert.AnError).Once()
-// 			},
-// 			wantErr: fmt.Errorf("failed to create release: %w", assert.AnError),
-// 		},
-// 		{
-// 			name:        "gin package already released",
-// 			repoToNotes: repoToNotes,
-// 			setup: func() {
-// 				// Mock gin package already released
-// 				s.mockGithub.EXPECT().GetReleases(owner, "gin", &github.ListOptions{
-// 					Page:    1,
-// 					PerPage: 10,
-// 				}).Return([]*github.RepositoryRelease{
-// 					{
-// 						TagName: convert.Pointer("v1.15.0"),
-// 						Name:    convert.Pointer("Release gin v1.15.0"),
-// 					},
-// 					{
-// 						TagName: convert.Pointer("v1.16.0"),
-// 						Name:    convert.Pointer("Release gin v1.16.0"),
-// 					},
-// 				}, nil).Once()
-
-// 				// Mock releaseRepo for fiber package
-// 				s.mockGithub.EXPECT().GetReleases(owner, "fiber", &github.ListOptions{
-// 					Page:    1,
-// 					PerPage: 10,
-// 				}).Return([]*github.RepositoryRelease{
-// 					{
-// 						TagName: convert.Pointer("v1.15.0"),
-// 						Name:    convert.Pointer("Release fiber v1.15.0"),
-// 					},
-// 				}, nil).Once()
-
-// 				s.mockGithub.EXPECT().CreateRelease(owner, "fiber", &github.RepositoryRelease{
-// 					TagName:         convert.Pointer(packageTag),
-// 					TargetCommitish: convert.Pointer("master"),
-// 					Name:            convert.Pointer(repoToNotes["fiber"].Name),
-// 					Body:            convert.Pointer(repoToNotes["fiber"].Body),
-// 				}).Return(nil, nil).Once()
-
-// 				s.mockContext.EXPECT().NewLine().Once()
-// 			},
-// 			wantErr: nil,
-// 		},
-// 	}
-
-// 	for _, tt := range tests {
-// 		s.Run(tt.name, func() {
-// 			tt.setup()
-
-// 			err := s.release.releaseAllPackages(s.mockContext, packageTag, tt.repoToNotes)
-
-// 			s.Equal(tt.wantErr, err)
-// 		})
-// 	}
-// }
-
-// func (s *ReleaseTestSuite) Test_releaseRepo() {
-// 	var (
-// 		repo  = "framework"
-// 		tag   = "v1.16.0"
-// 		notes = &github.RepositoryReleaseNotes{
-// 			Name: "Release v1.16.0",
-// 			Body: "## What's Changed\n* Feature A\n* Bug fix B\n\n**Full Changelog**: https://github.com/goravel/framework/compare/v1.15.0...v1.16.0",
-// 		}
-// 	)
-
-// 	tests := []struct {
-// 		name    string
-// 		setup   func()
-// 		wantErr error
-// 	}{
-// 		{
-// 			name: "successful release creation",
-// 			setup: func() {
-// 				// Mock isReleaseExist returns false (release doesn't exist)
-// 				s.mockGithub.EXPECT().GetReleases(owner, repo, &github.ListOptions{
-// 					Page:    1,
-// 					PerPage: 10,
-// 				}).Return([]*github.RepositoryRelease{
-// 					{
-// 						TagName: convert.Pointer("v1.15.0"),
-// 						Name:    convert.Pointer("Release v1.15.0"),
-// 					},
-// 				}, nil).Once()
-
-// 				// Mock createRelease succeeds
-// 				s.mockGithub.EXPECT().CreateRelease(owner, repo, &github.RepositoryRelease{
-// 					TagName:         convert.Pointer(tag),
-// 					TargetCommitish: convert.Pointer("master"),
-// 					Name:            convert.Pointer(notes.Name),
-// 					Body:            convert.Pointer(notes.Body),
-// 				}).Return(nil, nil).Once()
-
-// 				// Mock releaseSuccess calls
-// 				s.mockContext.EXPECT().NewLine().Once()
-// 			},
-// 			wantErr: nil,
-// 		},
-// 		{
-// 			name: "release already exists",
-// 			setup: func() {
-// 				// Mock isReleaseExist returns true (release already exists)
-// 				s.mockGithub.EXPECT().GetReleases(owner, repo, &github.ListOptions{
-// 					Page:    1,
-// 					PerPage: 10,
-// 				}).Return([]*github.RepositoryRelease{
-// 					{
-// 						TagName: convert.Pointer("v1.15.0"),
-// 						Name:    convert.Pointer("Release v1.15.0"),
-// 					},
-// 					{
-// 						TagName: convert.Pointer("v1.16.0"),
-// 						Name:    convert.Pointer("Release v1.16.0"),
-// 					},
-// 				}, nil).Once()
-// 			},
-// 			wantErr: nil,
-// 		},
-// 		{
-// 			name: "isReleaseExist fails",
-// 			setup: func() {
-// 				// Mock isReleaseExist fails
-// 				s.mockGithub.EXPECT().GetReleases(owner, repo, &github.ListOptions{
-// 					Page:    1,
-// 					PerPage: 10,
-// 				}).Return(nil, assert.AnError).Once()
-// 			},
-// 			wantErr: assert.AnError,
-// 		},
-// 		{
-// 			name: "createRelease fails",
-// 			setup: func() {
-// 				// Mock isReleaseExist returns false (release doesn't exist)
-// 				s.mockGithub.EXPECT().GetReleases(owner, repo, &github.ListOptions{
-// 					Page:    1,
-// 					PerPage: 10,
-// 				}).Return([]*github.RepositoryRelease{
-// 					{
-// 						TagName: convert.Pointer("v1.15.0"),
-// 						Name:    convert.Pointer("Release v1.15.0"),
-// 					},
-// 				}, nil).Once()
-
-// 				// Mock createRelease fails
-// 				s.mockGithub.EXPECT().CreateRelease(owner, repo, &github.RepositoryRelease{
-// 					TagName:         convert.Pointer(tag),
-// 					TargetCommitish: convert.Pointer("master"),
-// 					Name:            convert.Pointer(notes.Name),
-// 					Body:            convert.Pointer(notes.Body),
-// 				}).Return(nil, assert.AnError).Once()
-// 			},
-// 			wantErr: fmt.Errorf("failed to create release: %w", assert.AnError),
-// 		},
-// 	}
-
-// 	for _, tt := range tests {
-// 		s.Run(tt.name, func() {
-// 			tt.setup()
-
-// 			err := s.release.releaseRepo(s.mockContext, repo, tag, notes)
-
-// 			s.Equal(tt.wantErr, err)
-// 		})
-// 	}
-// }
+			s.Equal(tt.wantErr, err)
+		})
+	}
+}
