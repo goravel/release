@@ -1,8 +1,10 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "baseBranches": ["master"],
   "extends": [
     "config:recommended"
+  ],
+  "labels": [
+    "🤖 Dependencies"
   ],
   "commitMessagePrefix": "chore: ",
   "lockFileMaintenance": {
@@ -10,6 +12,9 @@
     "automerge": true
   },
   "platformAutomerge": true,
+  "schedule": [
+    "* 0-3 * * 1"
+  ],
   "postUpdateOptions": [
     "gomodTidy"
   ],
@@ -20,9 +25,9 @@
         "minor",
         "patch"
       ],
+      "matchCurrentVersion": "!/^0/",
       "automerge": true
     }
   ],
-  "ignoreDeps": [],
-  "ignorePaths": []
+  "ignoreDeps": []
 }

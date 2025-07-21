@@ -1,0 +1,12 @@
+with-expecter: True
+disable-version-string: True
+all: True
+recursive: true
+resolve-type-alias: False
+issue-845-fix: True
+packages:
+  ./app/services:
+    config:
+      dir: app/mocks/{{replaceAll .InterfaceDirRelative "app" ""}}
+      filename: "{{.InterfaceName}}.go"
+      mockname: "{{.InterfaceName}}"
