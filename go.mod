@@ -9,7 +9,7 @@ require (
 	github.com/google/go-github/v73 v73.0.0
 	github.com/goravel/framework v1.16.0
 	github.com/goravel/gin v1.4.0
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.73.0
 )
 
