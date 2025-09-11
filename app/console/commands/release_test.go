@@ -844,7 +844,7 @@ go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.
 			s.release.real = tt.real
 			tt.setup()
 
-			pr, err := s.release.createUpgradePR(s.mockContext, repo, frameworkTag, dependencies)
+			pr, err := s.release.createUpgradePR(s.mockContext, repo, "master", frameworkTag, dependencies)
 
 			s.Equal(tt.wantPR, pr)
 			s.Equal(tt.wantErr, err)
@@ -853,16 +853,16 @@ go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.
 }
 
 func (s *ReleaseTestSuite) Test_getFrameworkReleaseInformation() {
+	tag := "v1.16.0"
+
 	tests := []struct {
 		name    string
-		tag     string
 		setup   func()
 		want    *ReleaseInformation
 		wantErr error
 	}{
 		{
 			name: "successful release information retrieval",
-			tag:  "v1.16.0",
 			setup: func() {
 				// Mock spinner success
 				s.mockContext.EXPECT().Spinner("Getting framework release information for v1.16.0...", mock.AnythingOfType("console.SpinnerOption")).
@@ -871,7 +871,7 @@ func (s *ReleaseTestSuite) Test_getFrameworkReleaseInformation() {
 					}).Once()
 
 				// Mock getLatestTag success
-				s.mockGithub.EXPECT().GetLatestRelease(owner, "framework").Return(&github.RepositoryRelease{
+				s.mockGithub.EXPECT().GetLatestRelease(owner, "framework", tag).Return(&github.RepositoryRelease{
 					TagName: convert.Pointer("v1.15.0"),
 					Name:    convert.Pointer("Release v1.15.0"),
 				}, nil).Once()
@@ -912,7 +912,6 @@ const (
 		},
 		{
 			name: "spinner fails",
-			tag:  "v1.16.0",
 			setup: func() {
 				s.mockContext.EXPECT().Spinner("Getting framework release information for v1.16.0...", mock.AnythingOfType("console.SpinnerOption")).
 					Return(assert.AnError).Once()
@@ -922,28 +921,26 @@ const (
 		},
 		{
 			name: "getLatestTag fails",
-			tag:  "v1.16.0",
 			setup: func() {
 				s.mockContext.EXPECT().Spinner("Getting framework release information for v1.16.0...", mock.AnythingOfType("console.SpinnerOption")).
 					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
 						return opts.Action()
 					}).Once()
 
-				s.mockGithub.EXPECT().GetLatestRelease(owner, "framework").Return(nil, assert.AnError).Once()
+				s.mockGithub.EXPECT().GetLatestRelease(owner, "framework", tag).Return(nil, assert.AnError).Once()
 			},
 			want:    nil,
 			wantErr: assert.AnError,
 		},
 		{
 			name: "getFrameworkCurrentTag fails",
-			tag:  "v1.16.0",
 			setup: func() {
 				s.mockContext.EXPECT().Spinner("Getting framework release information for v1.16.0...", mock.AnythingOfType("console.SpinnerOption")).
 					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
 						return opts.Action()
 					}).Once()
 
-				s.mockGithub.EXPECT().GetLatestRelease(owner, "framework").Return(&github.RepositoryRelease{
+				s.mockGithub.EXPECT().GetLatestRelease(owner, "framework", tag).Return(&github.RepositoryRelease{
 					TagName: convert.Pointer("v1.15.0"),
 				}, nil).Once()
 
@@ -955,14 +952,13 @@ const (
 		},
 		{
 			name: "generateReleaseNotes fails",
-			tag:  "v1.16.0",
 			setup: func() {
 				s.mockContext.EXPECT().Spinner("Getting framework release information for v1.16.0...", mock.AnythingOfType("console.SpinnerOption")).
 					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
 						return opts.Action()
 					}).Once()
 
-				s.mockGithub.EXPECT().GetLatestRelease(owner, "framework").Return(&github.RepositoryRelease{
+				s.mockGithub.EXPECT().GetLatestRelease(owner, "framework", tag).Return(&github.RepositoryRelease{
 					TagName: convert.Pointer("v1.15.0"),
 				}, nil).Once()
 
@@ -990,7 +986,7 @@ const (
 		s.Run(tt.name, func() {
 			tt.setup()
 
-			result, err := s.release.getFrameworkReleaseInformation(s.mockContext, tt.tag)
+			result, err := s.release.getFrameworkReleaseInformation(s.mockContext, tag)
 
 			s.Equal(tt.want, result)
 			s.Equal(tt.wantErr, err)
@@ -999,16 +995,16 @@ const (
 }
 
 func (s *ReleaseTestSuite) Test_getPackagesReleaseInformation() {
+	tag := "v1.4.0"
+
 	tests := []struct {
 		name    string
-		tag     string
 		setup   func()
 		want    []*ReleaseInformation
 		wantErr error
 	}{
 		{
 			name: "successful retrieval for all packages",
-			tag:  "v1.4.0",
 			setup: func() {
 				// Mock successful retrieval for all packages
 				for _, pkg := range packages {
@@ -1018,7 +1014,7 @@ func (s *ReleaseTestSuite) Test_getPackagesReleaseInformation() {
 						}).Once()
 
 					// Mock getLatestTag success
-					s.mockGithub.EXPECT().GetLatestRelease(owner, pkg).Return(&github.RepositoryRelease{
+					s.mockGithub.EXPECT().GetLatestRelease(owner, pkg, tag).Return(&github.RepositoryRelease{
 						TagName: convert.Pointer("v1.3.0"),
 						Name:    convert.Pointer(fmt.Sprintf("Release v1.3.0 for %s", pkg)),
 					}, nil).Once()
@@ -1055,7 +1051,6 @@ func (s *ReleaseTestSuite) Test_getPackagesReleaseInformation() {
 		},
 		{
 			name: "first package fails with getLatestTag error",
-			tag:  "v1.4.0",
 			setup: func() {
 				// Mock spinner for first package
 				s.mockContext.EXPECT().Spinner("Getting gin release information for v1.4.0...", mock.AnythingOfType("console.SpinnerOption")).
@@ -1064,14 +1059,13 @@ func (s *ReleaseTestSuite) Test_getPackagesReleaseInformation() {
 					}).Once()
 
 				// Mock getLatestTag fails for first package
-				s.mockGithub.EXPECT().GetLatestRelease(owner, "gin").Return(nil, assert.AnError).Once()
+				s.mockGithub.EXPECT().GetLatestRelease(owner, "gin", tag).Return(nil, assert.AnError).Once()
 			},
 			want:    nil,
 			wantErr: assert.AnError,
 		},
 		{
 			name: "middle package fails with generateReleaseNotes error",
-			tag:  "v1.4.0",
 			setup: func() {
 				// Mock successful retrieval for first package (gin)
 				s.mockContext.EXPECT().Spinner("Getting gin release information for v1.4.0...", mock.AnythingOfType("console.SpinnerOption")).
@@ -1079,7 +1073,7 @@ func (s *ReleaseTestSuite) Test_getPackagesReleaseInformation() {
 						return opts.Action()
 					}).Once()
 
-				s.mockGithub.EXPECT().GetLatestRelease(owner, "gin").Return(&github.RepositoryRelease{
+				s.mockGithub.EXPECT().GetLatestRelease(owner, "gin", tag).Return(&github.RepositoryRelease{
 					TagName: convert.Pointer("v1.3.0"),
 				}, nil).Once()
 
@@ -1098,7 +1092,7 @@ func (s *ReleaseTestSuite) Test_getPackagesReleaseInformation() {
 						return opts.Action()
 					}).Once()
 
-				s.mockGithub.EXPECT().GetLatestRelease(owner, "fiber").Return(&github.RepositoryRelease{
+				s.mockGithub.EXPECT().GetLatestRelease(owner, "fiber", tag).Return(&github.RepositoryRelease{
 					TagName: convert.Pointer("v1.3.0"),
 				}, nil).Once()
 
@@ -1113,7 +1107,6 @@ func (s *ReleaseTestSuite) Test_getPackagesReleaseInformation() {
 		},
 		{
 			name: "spinner fails for first package",
-			tag:  "v1.4.0",
 			setup: func() {
 				s.mockContext.EXPECT().Spinner("Getting gin release information for v1.4.0...", mock.AnythingOfType("console.SpinnerOption")).
 					Return(assert.AnError).Once()
@@ -1123,7 +1116,6 @@ func (s *ReleaseTestSuite) Test_getPackagesReleaseInformation() {
 		},
 		{
 			name: "getLatestTag returns nil release - should succeed with empty latestTag",
-			tag:  "v1.4.0",
 			setup: func() {
 				// Mock for first package only since we're testing early termination
 				s.mockContext.EXPECT().Spinner("Getting gin release information for v1.4.0...", mock.AnythingOfType("console.SpinnerOption")).
@@ -1131,7 +1123,7 @@ func (s *ReleaseTestSuite) Test_getPackagesReleaseInformation() {
 						return opts.Action()
 					}).Once()
 
-				s.mockGithub.EXPECT().GetLatestRelease(owner, "gin").Return(nil, nil).Once()
+				s.mockGithub.EXPECT().GetLatestRelease(owner, "gin", tag).Return(nil, nil).Once()
 
 				// When latestTag is empty, generateReleaseNotes should still work
 				s.mockGithub.EXPECT().GenerateReleaseNotes(owner, "gin", &github.GenerateNotesOptions{
@@ -1149,7 +1141,7 @@ func (s *ReleaseTestSuite) Test_getPackagesReleaseInformation() {
 						return opts.Action()
 					}).Once()
 
-				s.mockGithub.EXPECT().GetLatestRelease(owner, "fiber").Return(&github.RepositoryRelease{
+				s.mockGithub.EXPECT().GetLatestRelease(owner, "fiber", tag).Return(&github.RepositoryRelease{
 					TagName: convert.Pointer("v1.3.0"),
 				}, nil).Once()
 
@@ -1169,7 +1161,7 @@ func (s *ReleaseTestSuite) Test_getPackagesReleaseInformation() {
 							return opts.Action()
 						}).Once()
 
-					s.mockGithub.EXPECT().GetLatestRelease(owner, pkg).Return(&github.RepositoryRelease{
+					s.mockGithub.EXPECT().GetLatestRelease(owner, pkg, tag).Return(&github.RepositoryRelease{
 						TagName: convert.Pointer("v1.3.0"),
 					}, nil).Once()
 
@@ -1230,7 +1222,7 @@ func (s *ReleaseTestSuite) Test_getPackagesReleaseInformation() {
 		s.Run(tt.name, func() {
 			tt.setup()
 
-			result, err := s.release.getPackagesReleaseInformation(s.mockContext, tt.tag)
+			result, err := s.release.getPackagesReleaseInformation(s.mockContext, tag)
 
 			s.Equal(tt.want, result)
 			s.Equal(tt.wantErr, err)
@@ -1375,7 +1367,7 @@ const (
 		s.Run(tt.name, func() {
 			tt.setup()
 
-			version, err := s.release.getFrameworkCurrentTag()
+			version, err := s.release.getFrameworkCurrentTag("master")
 
 			s.Equal(tt.wantVersion, version)
 			s.Equal(tt.wantErr, err)
@@ -1460,6 +1452,8 @@ func (s *ReleaseTestSuite) Test_generateReleaseNotes() {
 }
 
 func (s *ReleaseTestSuite) Test_getLatestTag() {
+	tag := "v1.16.2"
+
 	tests := []struct {
 		name    string
 		repo    string
@@ -1476,7 +1470,7 @@ func (s *ReleaseTestSuite) Test_getLatestTag() {
 					Name:    convert.Pointer("Release v1.16.0"),
 					Body:    convert.Pointer("This is a test release"),
 				}
-				s.mockGithub.EXPECT().GetLatestRelease(owner, "gin").Return(mockRelease, nil).Once()
+				s.mockGithub.EXPECT().GetLatestRelease(owner, "gin", tag).Return(mockRelease, nil).Once()
 			},
 			wantTag: "v1.16.0",
 			wantErr: nil,
@@ -1485,7 +1479,7 @@ func (s *ReleaseTestSuite) Test_getLatestTag() {
 			name: "github API error",
 			repo: "gin",
 			setup: func() {
-				s.mockGithub.EXPECT().GetLatestRelease(owner, "gin").Return(nil, assert.AnError).Once()
+				s.mockGithub.EXPECT().GetLatestRelease(owner, "gin", tag).Return(nil, assert.AnError).Once()
 			},
 			wantTag: "",
 			wantErr: assert.AnError,
@@ -1494,7 +1488,7 @@ func (s *ReleaseTestSuite) Test_getLatestTag() {
 			name: "github API returns nil release",
 			repo: "fiber",
 			setup: func() {
-				s.mockGithub.EXPECT().GetLatestRelease(owner, "fiber").Return(nil, nil).Once()
+				s.mockGithub.EXPECT().GetLatestRelease(owner, "fiber", tag).Return(nil, nil).Once()
 			},
 			wantTag: "",
 		},
@@ -1507,7 +1501,7 @@ func (s *ReleaseTestSuite) Test_getLatestTag() {
 					Name:    convert.Pointer("Release without tag"),
 					Body:    convert.Pointer("This release has no tag"),
 				}
-				s.mockGithub.EXPECT().GetLatestRelease(owner, "framework").Return(mockRelease, nil).Once()
+				s.mockGithub.EXPECT().GetLatestRelease(owner, "framework", tag).Return(mockRelease, nil).Once()
 			},
 			wantTag: "",
 			wantErr: fmt.Errorf("latest release tag name is nil for %s/framework", owner),
@@ -1521,7 +1515,7 @@ func (s *ReleaseTestSuite) Test_getLatestTag() {
 					Name:    convert.Pointer("Release with empty tag"),
 					Body:    convert.Pointer("This release has empty tag"),
 				}
-				s.mockGithub.EXPECT().GetLatestRelease(owner, "example").Return(mockRelease, nil).Once()
+				s.mockGithub.EXPECT().GetLatestRelease(owner, "example", tag).Return(mockRelease, nil).Once()
 			},
 			wantTag: "",
 			wantErr: nil,
@@ -1532,7 +1526,7 @@ func (s *ReleaseTestSuite) Test_getLatestTag() {
 		s.Run(tt.name, func() {
 			tt.setup()
 
-			tag, err := s.release.getLatestTag(tt.repo)
+			tag, err := s.release.getLatestTag(tt.repo, tag)
 
 			s.Equal(tt.wantTag, tag)
 			s.Equal(tt.wantErr, err)

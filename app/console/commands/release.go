@@ -110,6 +110,10 @@ func (r *Release) Handle(ctx console.Context) error {
 		return r.releaseMajor(ctx)
 	}
 
+	if ctx.Argument(0) == "patch" {
+		return r.releasePatch(ctx)
+	}
+
 	return nil
 }
 
@@ -198,14 +202,14 @@ func (r *Release) confirmReleaseInformations(ctx console.Context, releaseInfos [
 		color.Yellow().Println(fmt.Sprintf("Please check %s/%s information:", owner, releaseInfo.repo))
 		ctx.NewLine()
 
-		color.Black().Print("The latest tag is:     ")
+		color.Black().Print("The latest tag is:             ")
 		color.Red().Println(releaseInfo.latestTag)
 
-		color.Black().Print("The tag to release is: ")
+		color.Black().Print("The tag to release is:         ")
 		color.Red().Println(releaseInfo.tag)
 
 		if releaseInfo.currentTag != "" {
-			color.Black().Print("The current tag is:    ")
+			color.Black().Print("The current tag in code is:    ")
 			color.Red().Println(releaseInfo.currentTag)
 
 			if releaseInfo.currentTag != releaseInfo.tag {
@@ -227,15 +231,15 @@ func (r *Release) confirmReleaseInformations(ctx console.Context, releaseInfos [
 	return nil
 }
 
-func (r *Release) createRelease(repo, tagName string, notes *github.RepositoryReleaseNotes) error {
+func (r *Release) createRelease(repo, tag string, notes *github.RepositoryReleaseNotes) error {
 	if !r.real {
 		color.Yellow().Println("Preview mode, skip creating release for " + repo)
 		return nil
 	}
 
 	_, err := r.github.CreateRelease(owner, repo, &github.RepositoryRelease{
-		TagName:         convert.Pointer(tagName),
-		TargetCommitish: convert.Pointer("master"),
+		TagName:         convert.Pointer(tag),
+		TargetCommitish: convert.Pointer(r.getBranchFromTag(tag)),
 		Name:            convert.Pointer(notes.Name),
 		Body:            convert.Pointer(notes.Body),
 	})
@@ -243,43 +247,26 @@ func (r *Release) createRelease(repo, tagName string, notes *github.RepositoryRe
 	return err
 }
 
-func (r *Release) createUpgradePRForExample(ctx console.Context, frameworkTag, packageTag string) (*github.PullRequest, error) {
-	return r.createUpgradePR(ctx, "example", frameworkTag, []string{
-		fmt.Sprintf("go get github.com/goravel/framework@%s", frameworkTag),
-		fmt.Sprintf("go get github.com/goravel/gin@%s", packageTag),
-		fmt.Sprintf("go get github.com/goravel/fiber@%s", packageTag),
-		fmt.Sprintf("go get github.com/goravel/s3@%s", packageTag),
-		fmt.Sprintf("go get github.com/goravel/oss@%s", packageTag),
-		fmt.Sprintf("go get github.com/goravel/cos@%s", packageTag),
-		fmt.Sprintf("go get github.com/goravel/minio@%s", packageTag),
-		fmt.Sprintf("go get github.com/goravel/postgres@%s", packageTag),
-		fmt.Sprintf("go get github.com/goravel/mysql@%s", packageTag),
-		fmt.Sprintf("go get github.com/goravel/sqlserver@%s", packageTag),
-		fmt.Sprintf("go get github.com/goravel/sqlite@%s", packageTag),
-		fmt.Sprintf("go get github.com/goravel/redis@%s", packageTag),
-	})
+func (r *Release) createUpgradePRForExample(ctx console.Context, frameworkTag string, dependencies []string) (*github.PullRequest, error) {
+	return r.createUpgradePR(ctx, "example", r.getBranchFromTag(frameworkTag), frameworkTag, dependencies)
 }
 
 func (r *Release) createUpgradePRForExampleClient(ctx console.Context, frameworkTag, packageTag string) (*github.PullRequest, error) {
-	return r.createUpgradePR(ctx, "example-client", frameworkTag, []string{
+	return r.createUpgradePR(ctx, "example-client", r.getBranchFromTag(frameworkTag), frameworkTag, []string{
 		fmt.Sprintf("go get github.com/goravel/framework@%s", frameworkTag),
 		fmt.Sprintf("go get github.com/goravel/gin@%s", packageTag),
 	})
 }
 
-func (r *Release) createUpgradePRForGoravel(ctx console.Context, frameworkTag, packageTag string) (*github.PullRequest, error) {
-	return r.createUpgradePR(ctx, "goravel", frameworkTag, []string{
-		fmt.Sprintf("go get github.com/goravel/framework@%s", frameworkTag),
-		fmt.Sprintf("go get github.com/goravel/gin@%s", packageTag),
-		fmt.Sprintf("go get github.com/goravel/postgres@%s", packageTag),
-	})
+func (r *Release) createUpgradePRForGoravel(ctx console.Context, frameworkTag string, dependencies []string) (*github.PullRequest, error) {
+	return r.createUpgradePR(ctx, "goravel", r.getBranchFromTag(frameworkTag), frameworkTag, dependencies)
 }
 
 func (r *Release) createUpgradePRsForPackages(ctx console.Context, frameworkTag string) (map[string]*github.PullRequest, error) {
 	packageToPR := make(map[string]*github.PullRequest)
 
 	for _, pkg := range packages {
-		pr, err := r.createUpgradePR(ctx, pkg, frameworkTag, []string{
+		pr, err := r.createUpgradePR(ctx, pkg, "master", frameworkTag, []string{
 			fmt.Sprintf("go get github.com/goravel/framework@%s", frameworkTag),
 		})
 		if err != nil {
@@ -292,7 +279,7 @@ func (r *Release) createUpgradePRsForPackages(ctx console.Context, frameworkTag 
 	return packageToPR, nil
 }
 
-func (r *Release) createUpgradePR(ctx console.Context, repo, frameworkTag string, dependencies []string) (*github.PullRequest, error) {
+func (r *Release) createUpgradePR(ctx console.Context, repo, baseBranch, frameworkTag string, dependencies []string) (*github.PullRequest, error) {
 	defer func() {
 		_, _ = r.process.Run(fmt.Sprintf("rm -rf %s", repo))
 	}()
@@ -318,8 +305,8 @@ func (r *Release) createUpgradePR(ctx console.Context, repo, frameworkTag string
 			}
 
 			commandToCloneAndMod := fmt.Sprintf(`rm -rf %s && git clone git@github.com:%s/%s.git &&
-cd %s && git checkout master && git branch -D %s 2>/dev/null || true && git checkout -b %s &&
-%s && go mod tidy`, repo, owner, repo, repo, upgradeBranch, upgradeBranch, dependencyCommands)
+cd %s && git checkout %s && git branch -D %s 2>/dev/null || true && git checkout -b %s &&
+%s && go mod tidy`, repo, owner, repo, repo, baseBranch, upgradeBranch, upgradeBranch, dependencyCommands)
 			if _, err := r.executeCommand(commandToCloneAndMod); err != nil {
 				return fmt.Errorf("failed to clone repo and mod for %s: %w", repo, err)
 			}
@@ -366,7 +353,7 @@ cd %s && git checkout master && git branch -D %s 2>/dev/null || true && git chec
 				pr, err = r.github.CreatePullRequest(owner, repo, &github.NewPullRequest{
 					Title: convert.Pointer(fmt.Sprintf("chore: Upgrade framework to %s (auto)", frameworkTag)),
 					Head:  convert.Pointer(upgradeBranch),
-					Base:  convert.Pointer("master"),
+					Base:  convert.Pointer(baseBranch),
 				})
 				if err != nil {
 					return err
@@ -399,12 +386,12 @@ func (r *Release) getFrameworkReleaseInformation(ctx console.Context, tag string
 
 	if err := ctx.Spinner(fmt.Sprintf("Getting framework release information for %s...", tag), console.SpinnerOption{
 		Action: func() error {
-			latestTag, err := r.getLatestTag("framework")
+			latestTag, err := r.getLatestTag("framework", tag)
 			if err != nil {
 				return err
 			}
 
-			currentTag, err := r.getFrameworkCurrentTag()
+			currentTag, err := r.getFrameworkCurrentTag(r.getBranchFromTag(tag))
 			if err != nil {
 				return err
 			}
@@ -440,6 +427,15 @@ func (r *Release) getPackagesReleaseInformation(ctx console.Context, tag string)
 			return nil, err
 		}
 
+		if pkg == "installer" {
+			currentTag, err := r.getInstallerCurrentTag()
+			if err != nil {
+				return nil, err
+			}
+
+			releaseInfo.currentTag = currentTag
+		}
+
 		releaseInfos = append(releaseInfos, releaseInfo)
 	}
 
@@ -451,7 +447,7 @@ func (r *Release) getPackageReleaseInformation(ctx console.Context, repo string,
 
 	if err := ctx.Spinner(fmt.Sprintf("Getting %s release information for %s...", repo, tag), console.SpinnerOption{
 		Action: func() error {
-			latestTag, err := r.getLatestTag(repo)
+			latestTag, err := r.getLatestTag(repo, tag)
 			if err != nil {
 				return err
 			}
@@ -477,8 +473,8 @@ func (r *Release) getPackageReleaseInformation(ctx console.Context, repo string,
 	return releaseInformation, nil
 }
 
-func (r *Release) getFrameworkCurrentTag() (string, error) {
-	response, err := r.http.Get("https://raw.githubusercontent.com/goravel/framework/refs/heads/master/support/constant.go")
+func (r *Release) getFrameworkCurrentTag(branch string) (string, error) {
+	response, err := r.http.Get(fmt.Sprintf("https://raw.githubusercontent.com/goravel/framework/refs/heads/%s/support/constant.go", branch))
 	if err != nil {
 		return "", err
 	}
@@ -489,7 +485,7 @@ func (r *Release) getFrameworkCurrentTag() (string, error) {
 	}
 
 	// Extract version from body using regex
-	versionRegex := regexp.MustCompile(`Version\s*=\s*"([^"]+)"`)
+	versionRegex := regexp.MustCompile(`Version\s.*?=\s*"([^"]+)"`)
 	matches := versionRegex.FindStringSubmatch(body)
 	var currentVersion string
 	if len(matches) > 1 {
@@ -501,11 +497,35 @@ func (r *Release) getFrameworkCurrentTag() (string, error) {
 	return currentVersion, nil
 }
 
-func (r *Release) generateReleaseNotes(repo, tagName, previousTagName string) (*github.RepositoryReleaseNotes, error) {
+func (r *Release) getInstallerCurrentTag() (string, error) {
+	response, err := r.http.Get("https://raw.githubusercontent.com/goravel/installer/refs/heads/master/support/constant.go")
+	if err != nil {
+		return "", err
+	}
+
+	body, err := response.Body()
+	if err != nil {
+		return "", err
+	}
+
+	// Extract version from body using regex
+	versionRegex := regexp.MustCompile(`Version\s.*?=\s*"([^"]+)"`)
+	matches := versionRegex.FindStringSubmatch(body)
+	var currentVersion string
+	if len(matches) > 1 {
+		currentVersion = matches[1]
+	} else {
+		return "", fmt.Errorf("could not extract goravel/installer version from code")
+	}
+
+	return currentVersion, nil
+}
+
+func (r *Release) generateReleaseNotes(repo, tag, previousTag string) (*github.RepositoryReleaseNotes, error) {
 	notes, err := r.github.GenerateReleaseNotes(owner, repo, &github.GenerateNotesOptions{
-		TagName:         tagName,
-		PreviousTagName: convert.Pointer(previousTagName),
-		TargetCommitish: convert.Pointer("master"),
+		TagName:         tag,
+		PreviousTagName: convert.Pointer(previousTag),
+		TargetCommitish: convert.Pointer(r.getBranchFromTag(tag)),
 	})
 	if err != nil {
 		return nil, err
@@ -517,8 +537,8 @@ func (r *Release) generateReleaseNotes(repo, tagName, previousTagName string) (*
 	return notes, nil
 }
 
-func (r *Release) getLatestTag(repo string) (string, error) {
-	latestRelease, err := r.github.GetLatestRelease(owner, repo)
+func (r *Release) getLatestTag(repo, tag string) (string, error) {
+	latestRelease, err := r.github.GetLatestRelease(owner, repo, tag)
 	if err != nil {
 		return "", err
 	}
@@ -609,7 +629,7 @@ func (r *Release) releaseMajor(ctx console.Context) error {
 	}
 
 	if !ctx.Confirm("Did you test in example?") {
-		if err := r.testInExample(ctx); err != nil {
+		if err := r.testInExample(ctx, "master"); err != nil {
 			return err
 		}
 	}
@@ -655,7 +675,20 @@ func (r *Release) releaseMajor(ctx console.Context) error {
 		}
 	}
 
-	examplePR, err := r.createUpgradePRForExample(ctx, frameworkTag, packageTag)
+	examplePR, err := r.createUpgradePRForExample(ctx, frameworkTag, []string{
+		fmt.Sprintf("go get github.com/goravel/framework@%s", frameworkTag),
+		fmt.Sprintf("go get github.com/goravel/gin@%s", packageTag),
+		fmt.Sprintf("go get github.com/goravel/fiber@%s", packageTag),
+		fmt.Sprintf("go get github.com/goravel/s3@%s", packageTag),
+		fmt.Sprintf("go get github.com/goravel/oss@%s", packageTag),
+		fmt.Sprintf("go get github.com/goravel/cos@%s", packageTag),
+		fmt.Sprintf("go get github.com/goravel/minio@%s", packageTag),
+		fmt.Sprintf("go get github.com/goravel/postgres@%s", packageTag),
+		fmt.Sprintf("go get github.com/goravel/mysql@%s", packageTag),
+		fmt.Sprintf("go get github.com/goravel/sqlserver@%s", packageTag),
+		fmt.Sprintf("go get github.com/goravel/sqlite@%s", packageTag),
+		fmt.Sprintf("go get github.com/goravel/redis@%s", packageTag),
+	})
 	if err != nil {
 		return err
 	}
@@ -665,7 +698,11 @@ func (r *Release) releaseMajor(ctx console.Context) error {
 		return err
 	}
 
-	goravelPR, err := r.createUpgradePRForGoravel(ctx, frameworkTag, packageTag)
+	goravelPR, err := r.createUpgradePRForGoravel(ctx, frameworkTag, []string{
+		fmt.Sprintf("go get github.com/goravel/framework@%s", frameworkTag),
+		fmt.Sprintf("go get github.com/goravel/gin@%s", packageTag),
+		fmt.Sprintf("go get github.com/goravel/postgres@%s", packageTag),
+	})
 	if err != nil {
 		return err
 	}
@@ -702,6 +739,78 @@ func (r *Release) releaseMajor(ctx console.Context) error {
 	return nil
 }
 
+func (r *Release) releasePatch(ctx console.Context) error {
+	frameworkTag := ctx.Option("framework")
+
+	if frameworkTag == "" {
+		return fmt.Errorf("framework tag is required, please use --framework to release")
+	}
+
+	branch := r.getBranchFromTag(frameworkTag)
+
+	if !ctx.Confirm("Did you test in example?") {
+		if err := r.testInExample(ctx, branch); err != nil {
+			return err
+		}
+	}
+
+	goravelReleaseInfo, err := r.getPackageReleaseInformation(ctx, "goravel", frameworkTag)
+	if err != nil {
+		return err
+	}
+
+	frameworkReleaseInfo, err := r.getFrameworkReleaseInformation(ctx, frameworkTag)
+	if err != nil {
+		return err
+	}
+
+	if !ctx.Confirm("Did you confirm the release information?") {
+		releaseInfos := []*ReleaseInformation{goravelReleaseInfo, frameworkReleaseInfo}
+		if err := r.confirmReleaseInformations(ctx, releaseInfos); err != nil {
+			return err
+		}
+	}
+
+	if err := r.releaseRepo(ctx, frameworkReleaseInfo); err != nil {
+		return err
+	}
+
+	if !ctx.Confirm("Do you want to upgrade goravel and example?") {
+		r.releasePatchSuccess(ctx, frameworkTag)
+
+		return nil
+	}
+
+	examplePR, err := r.createUpgradePRForExample(ctx, frameworkTag, []string{
+		fmt.Sprintf("go get github.com/goravel/framework@%s", frameworkTag),
+	})
+	if err != nil {
+		return err
+	}
+
+	goravelPR, err := r.createUpgradePRForGoravel(ctx, frameworkTag, []string{
+		fmt.Sprintf("go get github.com/goravel/framework@%s", frameworkTag),
+	})
+	if err != nil {
+		return err
+	}
+
+	if err := r.checkPRsMergeStatus(ctx, map[string]*github.PullRequest{
+		"example": examplePR,
+		"goravel": goravelPR,
+	}); err != nil {
+		return fmt.Errorf("failed to check upgrade PRs merge status: %w", err)
+	}
+
+	if err := r.releaseRepo(ctx, goravelReleaseInfo); err != nil {
+		return err
+	}
+
+	r.releasePatchSuccess(ctx, frameworkTag)
+
+	return nil
+}
+
 func (r *Release) releaseMajorSuccess(ctx console.Context, frameworkTag, packageTag string) {
 	ctx.NewLine()
 	color.Green().Println(fmt.Sprintf("Release goravel/framework %s and sub-packages %s success!", frameworkTag, packageTag))
@@ -709,8 +818,14 @@ func (r *Release) releaseMajorSuccess(ctx console.Context, frameworkTag, package
 	color.Black().Println(fmt.Sprintf("1. Set goravel/goravel %s as default branch: https://github.com/goravel/goravel/settings", frameworkTag))
 	color.Black().Println(fmt.Sprintf("2. Set goravel/example %s as default branch: https://github.com/goravel/example/settings", frameworkTag))
 	color.Black().Println("3. Install the new version via goravel/installer and test the project works fine")
-	color.Black().Println("4. Merge the upgrade document PR (this step will be automated in the future): https://github.com/goravel/docs/pulls")
-	color.Black().Println("5. Switch the default branch if there are repositories that specify another branch as default branch")
+	color.Black().Println("4. Modify the support policy: https://www.goravel.dev/getting-started/releases.html#support-policy")
+	color.Black().Println("5. Merge the upgrade document PR (this step will be automated in the future): https://github.com/goravel/docs/pulls")
+	color.Black().Println("6. Switch the default branch if there are repositories that specify another branch as default branch")
+}
+
+func (r *Release) releasePatchSuccess(ctx console.Context, frameworkTag string) {
+	ctx.NewLine()
+	color.Green().Println(fmt.Sprintf("Release goravel/framework %s success!", frameworkTag))
 }
 
 func (r *Release) releaseSuccess(repo, tagName string) {
@@ -718,17 +833,16 @@ func (r *Release) releaseSuccess(repo, tagName string) {
 	color.Green().Println(fmt.Sprintf("Release link: https://github.com/%s/%s/releases/tag/%s", owner, repo, tagName))
 }
 
-func (r *Release) testInExample(ctx console.Context) error {
+func (r *Release) testInExample(ctx console.Context, branch string) error {
 	defer func() {
 		_, _ = r.process.Run("rm -rf example")
 	}()
 
 	if err := ctx.Spinner("Testing in example...", console.SpinnerOption{
 		Action: func() error {
-			commands := `rm -rf example && git clone git@github.com:goravel/example.git && 
-				cd example && git checkout master &&
-				go get github.com/goravel/framework@master && 
-				go get github.com/goravel/gin@master && 
+			var packages string
+			if branch == "master" {
+				packages = `go get github.com/goravel/gin@master && 
 				go get github.com/goravel/fiber@master && 
 				go get github.com/goravel/s3@master && 
 				go get github.com/goravel/oss@master && 
@@ -738,8 +852,13 @@ func (r *Release) testInExample(ctx console.Context) error {
 				go get github.com/goravel/mysql@master && 
 				go get github.com/goravel/sqlserver@master && 
 				go get github.com/goravel/sqlite@master && 
-				go get github.com/goravel/redis@master && 
-				go mod tidy && go test ./...`
+				go get github.com/goravel/redis@master && `
+			}
+
+			commands := fmt.Sprintf(`rm -rf example && git clone git@github.com:goravel/example.git && 
+				cd example && git checkout %s &&
+				go get github.com/goravel/framework@%s && 
+				%s go mod tidy && go test ./...`, branch, branch, packages)
 
 			cmd := exec.Command("sh", "-c", commands)
 
@@ -787,6 +906,22 @@ func (r *Release) testInExample(ctx console.Context) error {
 	color.Green().Println("Testing in example success!")
 
 	return nil
+}
+
+func (r *Release) getBranchFromTag(tag string) string {
+	tagArr := strings.Split(tag, ".")
+	branch := strings.Join(append(tagArr[:2], "x"), ".")
+
+	exist, err := r.github.CheckBranchExists(owner, "framework", branch)
+	if err != nil {
+		panic(fmt.Errorf("failed to check branch %s exist for %s/%s: %w", branch, owner, "framework", err))
+	}
+
+	if !exist {
+		branch = "master"
+	}
+
+	return branch
 }
 
 func asyncLog(reader io.ReadCloser) error {
