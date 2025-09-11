@@ -20,6 +20,64 @@ func (_m *Github) EXPECT() *Github_Expecter {
 	return &Github_Expecter{mock: &_m.Mock}
 }
 
+// CheckBranchExists provides a mock function with given fields: owner, repo, branch
+func (_m *Github) CheckBranchExists(owner string, repo string, branch string) (bool, error) {
+	ret := _m.Called(owner, repo, branch)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CheckBranchExists")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string, string, string) (bool, error)); ok {
+		return rf(owner, repo, branch)
+	}
+	if rf, ok := ret.Get(0).(func(string, string, string) bool); ok {
+		r0 = rf(owner, repo, branch)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(string, string, string) error); ok {
+		r1 = rf(owner, repo, branch)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// Github_CheckBranchExists_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckBranchExists'
+type Github_CheckBranchExists_Call struct {
+	*mock.Call
+}
+
+// CheckBranchExists is a helper method to define mock.On call
+//   - owner string
+//   - repo string
+//   - branch string
+func (_e *Github_Expecter) CheckBranchExists(owner interface{}, repo interface{}, branch interface{}) *Github_CheckBranchExists_Call {
+	return &Github_CheckBranchExists_Call{Call: _e.mock.On("CheckBranchExists", owner, repo, branch)}
+}
+
+func (_c *Github_CheckBranchExists_Call) Run(run func(owner string, repo string, branch string)) *Github_CheckBranchExists_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *Github_CheckBranchExists_Call) Return(_a0 bool, _a1 error) *Github_CheckBranchExists_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *Github_CheckBranchExists_Call) RunAndReturn(run func(string, string, string) (bool, error)) *Github_CheckBranchExists_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreatePullRequest provides a mock function with given fields: owner, repo, pr
 func (_m *Github) CreatePullRequest(owner string, repo string, pr *github.NewPullRequest) (*github.PullRequest, error) {
 	ret := _m.Called(owner, repo, pr)
@@ -200,9 +258,9 @@ func (_c *Github_GenerateReleaseNotes_Call) RunAndReturn(run func(string, string
 	return _c
 }
 
-// GetLatestRelease provides a mock function with given fields: owner, repo
-func (_m *Github) GetLatestRelease(owner string, repo string) (*github.RepositoryRelease, error) {
-	ret := _m.Called(owner, repo)
+// GetLatestRelease provides a mock function with given fields: owner, repo, tag
+func (_m *Github) GetLatestRelease(owner string, repo string, tag string) (*github.RepositoryRelease, error) {
+	ret := _m.Called(owner, repo, tag)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetLatestRelease")
@@ -210,19 +268,19 @@ func (_m *Github) GetLatestRelease(owner string, repo string) (*github.Repositor
 
 	var r0 *github.RepositoryRelease
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string, string) (*github.RepositoryRelease, error)); ok {
-		return rf(owner, repo)
+	if rf, ok := ret.Get(0).(func(string, string, string) (*github.RepositoryRelease, error)); ok {
+		return rf(owner, repo, tag)
 	}
-	if rf, ok := ret.Get(0).(func(string, string) *github.RepositoryRelease); ok {
-		r0 = rf(owner, repo)
+	if rf, ok := ret.Get(0).(func(string, string, string) *github.RepositoryRelease); ok {
+		r0 = rf(owner, repo, tag)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*github.RepositoryRelease)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(string, string) error); ok {
-		r1 = rf(owner, repo)
+	if rf, ok := ret.Get(1).(func(string, string, string) error); ok {
+		r1 = rf(owner, repo, tag)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -238,13 +296,14 @@ type Github_GetLatestRelease_Call struct {
 // GetLatestRelease is a helper method to define mock.On call
 //   - owner string
 //   - repo string
-func (_e *Github_Expecter) GetLatestRelease(owner interface{}, repo interface{}) *Github_GetLatestRelease_Call {
-	return &Github_GetLatestRelease_Call{Call: _e.mock.On("GetLatestRelease", owner, repo)}
+//   - tag string
+func (_e *Github_Expecter) GetLatestRelease(owner interface{}, repo interface{}, tag interface{}) *Github_GetLatestRelease_Call {
+	return &Github_GetLatestRelease_Call{Call: _e.mock.On("GetLatestRelease", owner, repo, tag)}
 }
 
-func (_c *Github_GetLatestRelease_Call) Run(run func(owner string, repo string)) *Github_GetLatestRelease_Call {
+func (_c *Github_GetLatestRelease_Call) Run(run func(owner string, repo string, tag string)) *Github_GetLatestRelease_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string))
+		run(args[0].(string), args[1].(string), args[2].(string))
 	})
 	return _c
 }
@@ -254,7 +313,7 @@ func (_c *Github_GetLatestRelease_Call) Return(_a0 *github.RepositoryRelease, _a
 	return _c
 }
 
-func (_c *Github_GetLatestRelease_Call) RunAndReturn(run func(string, string) (*github.RepositoryRelease, error)) *Github_GetLatestRelease_Call {
+func (_c *Github_GetLatestRelease_Call) RunAndReturn(run func(string, string, string) (*github.RepositoryRelease, error)) *Github_GetLatestRelease_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -5,16 +5,18 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/google/go-github/v73/github"
 	"github.com/goravel/framework/facades"
 )
 
 type Github interface {
+	CheckBranchExists(owner, repo, branch string) (bool, error)
 	CreatePullRequest(owner, repo string, pr *github.NewPullRequest) (*github.PullRequest, error)
 	CreateRelease(owner, repo string, release *github.RepositoryRelease) (*github.RepositoryRelease, error)
 	GenerateReleaseNotes(owner, repo string, opts *github.GenerateNotesOptions) (*github.RepositoryReleaseNotes, error)
-	GetLatestRelease(owner, repo string) (*github.RepositoryRelease, error)
+	GetLatestRelease(owner, repo, tag string) (*github.RepositoryRelease, error)
 	GetPullRequest(owner, repo string, number int) (*github.PullRequest, error)
 	GetPullRequests(owner, repo string, opts *github.PullRequestListOptions) ([]*github.PullRequest, error)
 	GetReleases(owner, repo string, opts *github.ListOptions) ([]*github.RepositoryRelease, error)
@@ -34,6 +36,29 @@ func NewGithubImpl(ctx context.Context) *GithubImpl {
 	client := github.NewTokenClient(ctx, token)
 
 	return &GithubImpl{ctx: ctx, client: client}
+}
+
+// CheckBranchExists checks if a branch exists in a repository
+func (r *GithubImpl) CheckBranchExists(owner, repo, branch string) (bool, error) {
+	_, response, err := r.client.Repositories.GetBranch(r.ctx, owner, repo, branch, 0)
+	if err != nil {
+		var apiErr *github.ErrorResponse
+		if errors.As(err, &apiErr) {
+			if apiErr.Response.StatusCode == http.StatusNotFound {
+				return false, nil
+			}
+		}
+
+		return false, fmt.Errorf("failed to check branch %s for %s/%s: %w", branch, owner, repo, err)
+	}
+	if response.StatusCode == http.StatusNotFound {
+		return false, nil
+	}
+	if response.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("failed to check branch %s for %s/%s: %s", branch, owner, repo, response.Status)
+	}
+
+	return true, nil
 }
 
 // CreatePullRequest creates a new pull request
@@ -76,8 +101,8 @@ func (r *GithubImpl) GenerateReleaseNotes(owner, repo string, opts *github.Gener
 }
 
 // GetLatestRelease gets the latest release for a repository
-func (r *GithubImpl) GetLatestRelease(owner, repo string) (*github.RepositoryRelease, error) {
-	release, response, err := r.client.Repositories.GetLatestRelease(r.ctx, owner, repo)
+func (r *GithubImpl) GetLatestRelease(owner, repo, tag string) (*github.RepositoryRelease, error) {
+	releases, response, err := r.client.Repositories.ListReleases(r.ctx, owner, repo, &github.ListOptions{Page: 1, PerPage: 50})
 	if err != nil {
 		var apiErr *github.ErrorResponse
 		if errors.As(err, &apiErr) {
@@ -94,7 +119,20 @@ func (r *GithubImpl) GetLatestRelease(owner, repo string) (*github.RepositoryRel
 	if response.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to get latest release for %s/%s: %s", owner, repo, response.Status)
 	}
-	return release, nil
+
+	if len(releases) == 0 {
+		return nil, nil
+	}
+
+	// v1.16.2 -> v1.16.
+	tagPrefix := strings.Join(strings.Split(tag, ".")[:2], ".") + "."
+	for _, release := range releases {
+		if strings.HasPrefix(release.GetTagName(), tagPrefix) {
+			return release, nil
+		}
+	}
+
+	return releases[0], nil
 }
 
 // GetPullRequest gets a specific pull request by number
