@@ -7,6 +7,7 @@ toolchain go1.25.1
 require (
 	github.com/gin-gonic/gin v1.10.1
 	github.com/google/go-github/v73 v73.0.0
+	github.com/google/go-github/v74 v74.0.0
 	github.com/goravel/framework v1.16.3
 	github.com/goravel/gin v1.4.0
 	github.com/stretchr/testify v1.11.1
