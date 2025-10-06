@@ -6,7 +6,7 @@ toolchain go1.25.1
 
 require (
 	github.com/gin-gonic/gin v1.11.0
-	github.com/google/go-github/v73 v73.0.0
+	github.com/google/go-github/v75 v75.0.0
 	github.com/google/go-github/v75 v75.0.0
 	github.com/goravel/framework v1.16.3
 	github.com/goravel/gin v1.4.0
