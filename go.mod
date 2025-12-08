@@ -2,13 +2,11 @@ module goravel
 
 go 1.24.0
 
-toolchain go1.25.4
+toolchain go1.25.5
 
 require (
 	github.com/gin-gonic/gin v1.11.0
 	github.com/google/go-github/v73 v73.0.0
-	github.com/google/go-github/v79 v79.0.0
-	github.com/google/go-github/v80 v80.0.0
 	github.com/goravel/framework v1.16.5
 	github.com/goravel/gin v1.4.0
 	github.com/stretchr/testify v1.11.1
