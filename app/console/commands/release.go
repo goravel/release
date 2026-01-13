@@ -14,10 +14,10 @@ import (
 	"github.com/goravel/framework/contracts/console"
 	"github.com/goravel/framework/contracts/console/command"
 	"github.com/goravel/framework/contracts/http/client"
-	"github.com/goravel/framework/facades"
 	"github.com/goravel/framework/support/color"
 	"github.com/goravel/framework/support/convert"
 
+	"goravel/app/facades"
 	"goravel/app/services"
 )
 
@@ -112,6 +112,10 @@ func (r *Release) Handle(ctx console.Context) error {
 
 	if ctx.Argument(0) == "patch" {
 		return r.releasePatch(ctx)
+	}
+
+	if ctx.Argument(0) == "preview" {
+		return r.preview(ctx)
 	}
 
 	return nil
@@ -579,6 +583,66 @@ func (r *Release) isReleaseExist(repo string, tag string) (bool, error) {
 	}
 
 	return false, nil
+}
+
+func (r *Release) preview(ctx console.Context) error {
+	frameworkTag := ctx.Option("framework")
+	packageTag := ctx.Option("packages")
+
+	var releaseInfos []*ReleaseInformation
+
+	if frameworkTag != "" {
+		goravelReleaseInfo, err := r.getPackageReleaseInformation(ctx, "goravel", frameworkTag)
+		if err != nil {
+			return err
+		}
+
+		frameworkReleaseInfo, err := r.getFrameworkReleaseInformation(ctx, frameworkTag)
+		if err != nil {
+			return err
+		}
+
+		releaseInfos = append(releaseInfos, goravelReleaseInfo, frameworkReleaseInfo)
+	}
+
+	if packageTag != "" {
+		packagesReleaseInfo, err := r.getPackagesReleaseInformation(ctx, packageTag)
+		if err != nil {
+			return err
+		}
+
+		releaseInfos = append(releaseInfos, packagesReleaseInfo...)
+	}
+
+	for _, releaseInfo := range releaseInfos {
+		r.divider(ctx)
+		color.Yellow().Println(fmt.Sprintf("Please check %s/%s information:", owner, releaseInfo.repo))
+		ctx.NewLine()
+
+		color.Black().Print("The latest tag is:             ")
+		color.Red().Println(releaseInfo.latestTag)
+
+		color.Black().Print("The tag to release is:         ")
+		color.Red().Println(releaseInfo.tag)
+
+		if releaseInfo.currentTag != "" {
+			color.Black().Print("The current tag in code is:    ")
+			color.Red().Println(releaseInfo.currentTag)
+
+			if releaseInfo.currentTag != releaseInfo.tag {
+				ctx.NewLine()
+				color.Red().Println("The current tag is not the same as the tag to release")
+			}
+		}
+
+		ctx.NewLine()
+		color.Black().Println(releaseInfo.notes.Name)
+		color.Black().Println(releaseInfo.notes.Body)
+
+		ctx.NewLine()
+	}
+
+	return nil
 }
 
 func (r *Release) pushBranch(ctx console.Context, repo, branch string) error {
