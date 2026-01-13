@@ -7,8 +7,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/go-github/v73/github"
-	"github.com/goravel/framework/facades"
+	"github.com/google/go-github/v81/github"
+
+	"goravel/app/facades"
 )
 
 type Github interface {
@@ -33,7 +34,7 @@ func NewGithubImpl(ctx context.Context) *GithubImpl {
 		panic("github token is not set")
 	}
 
-	client := github.NewTokenClient(ctx, token)
+	client := github.NewClient(nil).WithAuthToken(token)
 
 	return &GithubImpl{ctx: ctx, client: client}
 }
@@ -42,11 +43,8 @@ func NewGithubImpl(ctx context.Context) *GithubImpl {
 func (r *GithubImpl) CheckBranchExists(owner, repo, branch string) (bool, error) {
 	_, response, err := r.client.Repositories.GetBranch(r.ctx, owner, repo, branch, 0)
 	if err != nil {
-		var apiErr *github.ErrorResponse
-		if errors.As(err, &apiErr) {
-			if apiErr.Response.StatusCode == http.StatusNotFound {
-				return false, nil
-			}
+		if strings.Contains(err.Error(), "404 Not Found") {
+			return false, nil
 		}
 
 		return false, fmt.Errorf("failed to check branch %s for %s/%s: %w", branch, owner, repo, err)

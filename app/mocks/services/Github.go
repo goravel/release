@@ -3,7 +3,7 @@
 package services
 
 import (
-	github "github.com/google/go-github/v73/github"
+	github "github.com/google/go-github/v81/github"
 	mock "github.com/stretchr/testify/mock"
 )
 
