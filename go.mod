@@ -6,7 +6,7 @@ toolchain go1.25.5
 
 require (
 	github.com/google/go-github/v81 v81.0.0
-	github.com/goravel/framework v1.16.1-0.20260112093808-f40668e18d75
+	github.com/goravel/framework v1.16.1-0.20260113091405-aed3c54eb679
 	github.com/stretchr/testify v1.11.1
 )
 
@@ -94,5 +94,3 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gorm.io/gorm v1.31.1 // indirect
 )
-
-replace github.com/goravel/framework => ../framework
