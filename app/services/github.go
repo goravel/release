@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/go-github/v73/github"
+	"github.com/google/go-github/v81/github"
 
 	"goravel/app/facades"
 )
