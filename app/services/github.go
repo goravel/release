@@ -34,7 +34,7 @@ func NewGithubImpl(ctx context.Context) *GithubImpl {
 		panic("github token is not set")
 	}
 
-	client := github.NewTokenClient(ctx, token)
+	client := github.NewClient(nil).WithAuthToken(token)
 
 	return &GithubImpl{ctx: ctx, client: client}
 }
