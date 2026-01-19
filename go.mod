@@ -2,7 +2,7 @@ module goravel
 
 go 1.24.0
 
-toolchain go1.25.5
+toolchain go1.25.6
 
 tool github.com/vektra/mockery/v2
 
