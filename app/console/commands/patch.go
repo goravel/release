@@ -29,7 +29,12 @@ func (r *Patch) Extend() command.Extend {
 			&command.StringFlag{
 				Name:    "framework",
 				Aliases: []string{"f"},
-				Usage:   "Patch framework tag",
+				Usage:   "Patch framework tag, e.g. v1.16.2",
+			},
+			&command.StringFlag{
+				Name:    "packages",
+				Aliases: []string{"p"},
+				Usage:   "Related packages branch, e.g. v1.4.x",
 			},
 		},
 	}

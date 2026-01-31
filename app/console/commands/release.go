@@ -33,7 +33,7 @@ var packages = []string{
 }
 
 type ReleaseInformation struct {
-	// The current tag in master, goravel/framework has this tag for now.
+	// The current tag in master, only goravel/framework and goravel/installer has this tag currently.
 	currentTag string
 	// The latest tag actually
 	latestTag string
@@ -72,7 +72,7 @@ func (r *Release) Major() error {
 	if !r.ctx.Confirm("Did you test in sub-packages?") {
 		subPackages := append(packages, "example")
 		for _, pkg := range subPackages {
-			if err := r.testInSubPackage(pkg, "master"); err != nil {
+			if err := r.testInSubPackage(pkg, "master", "master"); err != nil {
 				return err
 			}
 		}
@@ -185,17 +185,18 @@ func (r *Release) Major() error {
 
 func (r *Release) Patch() error {
 	frameworkTag := r.ctx.Option("framework")
+	packageBranch := r.ctx.Option("packages")
 
 	if frameworkTag == "" {
 		return fmt.Errorf("framework tag is required, please use --framework to release")
 	}
 
-	branch := r.getBranchFromTag("framework", frameworkTag)
+	frameworkBranch := r.getBranchFromTag("framework", frameworkTag)
 
 	if !r.ctx.Confirm("Did you test in sub-packages?") {
 		subPackages := append(packages, "example")
 		for _, pkg := range subPackages {
-			if err := r.testInSubPackage(pkg, branch); err != nil {
+			if err := r.testInSubPackage(pkg, frameworkBranch, packageBranch); err != nil {
 				return err
 			}
 		}
@@ -844,13 +845,13 @@ func (r *Release) releaseSuccess(repo, tagName string) {
 	color.Green().Println(fmt.Sprintf("Release link: https://github.com/%s/%s/releases/tag/%s", owner, repo, tagName))
 }
 
-func (r *Release) testInSubPackage(pkg, branch string) error {
+func (r *Release) testInSubPackage(pkg, frameworkBranch, packageBranch string) error {
 	defer func() {
 		_ = facades.Process().Run(fmt.Sprintf("rm -rf %s", pkg))
 	}()
 
-	packages := ""
-	if pkg == "example" && branch == "master" {
+	packages := fmt.Sprintf("go get github.com/goravel/framework@%s && ", frameworkBranch)
+	if pkg == "example" && frameworkBranch == "master" {
 		packages = `go get github.com/goravel/gin@master && 
 				go get github.com/goravel/fiber@master && 
 				go get github.com/goravel/s3@master && 
@@ -865,7 +866,7 @@ func (r *Release) testInSubPackage(pkg, branch string) error {
 	}
 
 	initCommand := fmt.Sprintf(`rm -rf %s && git clone git@github.com:goravel/%s.git && 
-				cd %s && go get github.com/goravel/framework@%s && %s go mod tidy && go test ./...`, pkg, pkg, pkg, branch, packages)
+				cd %s && git checkout %s && %s go mod tidy && go test ./...`, pkg, pkg, pkg, packageBranch, packages)
 	if res := facades.Process().Run(initCommand); res.Failed() {
 		return fmt.Errorf("failed to test in %s: %w", pkg, res.Error())
 	}

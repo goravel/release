@@ -13,13 +13,24 @@ import (
 )
 
 type Github interface {
+	// CheckBranchExists checks if a branch exists in a repository
 	CheckBranchExists(owner, repo, branch string) (bool, error)
+	// CreatePullRequest creates a new pull request
 	CreatePullRequest(owner, repo string, pr *github.NewPullRequest) (*github.PullRequest, error)
+	// CreateRelease creates a new release
 	CreateRelease(owner, repo string, release *github.RepositoryRelease) (*github.RepositoryRelease, error)
+	// GenerateReleaseNotes generates release notes for a repository
 	GenerateReleaseNotes(owner, repo string, opts *github.GenerateNotesOptions) (*github.RepositoryReleaseNotes, error)
+	// GetLatestRelease gets the latest release for a repository.
+	// If tag is provided, it will return the latest release with the same major and minor version as the tag.
+	// For example, if tag is v1.16.2, it will return the latest release with tag starting with v1.16.
+	// If no such release is found, it will return the latest release.
 	GetLatestRelease(owner, repo, tag string) (*github.RepositoryRelease, error)
+	// GetPullRequest gets a specific pull request by number
 	GetPullRequest(owner, repo string, number int) (*github.PullRequest, error)
+	// GetPullRequests lists pull requests for a repository
 	GetPullRequests(owner, repo string, opts *github.PullRequestListOptions) ([]*github.PullRequest, error)
+	// GetReleases lists releases for a repository
 	GetReleases(owner, repo string, opts *github.ListOptions) ([]*github.RepositoryRelease, error)
 }
 
@@ -39,7 +50,6 @@ func NewGithubImpl(ctx context.Context) *GithubImpl {
 	return &GithubImpl{ctx: ctx, client: client}
 }
 
-// CheckBranchExists checks if a branch exists in a repository
 func (r *GithubImpl) CheckBranchExists(owner, repo, branch string) (bool, error) {
 	_, response, err := r.client.Repositories.GetBranch(r.ctx, owner, repo, branch, 0)
 	if err != nil {
@@ -59,7 +69,6 @@ func (r *GithubImpl) CheckBranchExists(owner, repo, branch string) (bool, error)
 	return true, nil
 }
 
-// CreatePullRequest creates a new pull request
 func (r *GithubImpl) CreatePullRequest(owner, repo string, pr *github.NewPullRequest) (*github.PullRequest, error) {
 	pullRequest, response, err := r.client.PullRequests.Create(r.ctx, owner, repo, pr)
 	if err != nil {
@@ -71,7 +80,6 @@ func (r *GithubImpl) CreatePullRequest(owner, repo string, pr *github.NewPullReq
 	return pullRequest, nil
 }
 
-// CreateRelease creates a new release
 func (r *GithubImpl) CreateRelease(owner, repo string, release *github.RepositoryRelease) (*github.RepositoryRelease, error) {
 	createdRelease, response, err := r.client.Repositories.CreateRelease(r.ctx, owner, repo, release)
 	if err != nil {
@@ -83,7 +91,6 @@ func (r *GithubImpl) CreateRelease(owner, repo string, release *github.Repositor
 	return createdRelease, nil
 }
 
-// GenerateReleaseNotes generates release notes for a repository
 func (r *GithubImpl) GenerateReleaseNotes(owner, repo string, opts *github.GenerateNotesOptions) (*github.RepositoryReleaseNotes, error) {
 	notes, response, err := r.client.Repositories.GenerateReleaseNotes(r.ctx, owner, repo, opts)
 	if err != nil {
@@ -98,7 +105,6 @@ func (r *GithubImpl) GenerateReleaseNotes(owner, repo string, opts *github.Gener
 	return notes, nil
 }
 
-// GetLatestRelease gets the latest release for a repository
 func (r *GithubImpl) GetLatestRelease(owner, repo, tag string) (*github.RepositoryRelease, error) {
 	releases, response, err := r.client.Repositories.ListReleases(r.ctx, owner, repo, &github.ListOptions{Page: 1, PerPage: 50})
 	if err != nil {
@@ -133,7 +139,6 @@ func (r *GithubImpl) GetLatestRelease(owner, repo, tag string) (*github.Reposito
 	return releases[0], nil
 }
 
-// GetPullRequest gets a specific pull request by number
 func (r *GithubImpl) GetPullRequest(owner, repo string, number int) (*github.PullRequest, error) {
 	pr, response, err := r.client.PullRequests.Get(r.ctx, owner, repo, number)
 	if err != nil {
@@ -145,7 +150,6 @@ func (r *GithubImpl) GetPullRequest(owner, repo string, number int) (*github.Pul
 	return pr, nil
 }
 
-// GetPullRequests lists pull requests for a repository
 func (r *GithubImpl) GetPullRequests(owner, repo string, opts *github.PullRequestListOptions) ([]*github.PullRequest, error) {
 	prs, response, err := r.client.PullRequests.List(r.ctx, owner, repo, opts)
 	if err != nil {
@@ -157,7 +161,6 @@ func (r *GithubImpl) GetPullRequests(owner, repo string, opts *github.PullReques
 	return prs, nil
 }
 
-// GetReleases lists releases for a repository
 func (r *GithubImpl) GetReleases(owner, repo string, opts *github.ListOptions) ([]*github.RepositoryRelease, error) {
 	releases, response, err := r.client.Repositories.ListReleases(r.ctx, owner, repo, opts)
 	if err != nil {
