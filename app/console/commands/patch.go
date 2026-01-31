@@ -36,6 +36,11 @@ func (r *Patch) Extend() command.Extend {
 				Aliases: []string{"p"},
 				Usage:   "Related packages branch, e.g. v1.4.x",
 			},
+			&command.BoolFlag{
+				Name:    "real",
+				Aliases: []string{"r"},
+				Usage:   "Real release",
+			},
 		},
 	}
 }

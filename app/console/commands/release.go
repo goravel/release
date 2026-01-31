@@ -184,6 +184,7 @@ func (r *Release) Major() error {
 }
 
 func (r *Release) Patch() error {
+	r.real = r.ctx.OptionBool("real")
 	frameworkTag := r.ctx.Option("framework")
 	packageBranch := r.ctx.Option("packages")
 
