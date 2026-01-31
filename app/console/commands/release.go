@@ -3,8 +3,6 @@ package commands
 import (
 	"context"
 	"fmt"
-	"goravel/app/facades"
-	"goravel/app/services"
 	"regexp"
 	"strings"
 
@@ -12,6 +10,9 @@ import (
 	"github.com/goravel/framework/contracts/console"
 	"github.com/goravel/framework/support/color"
 	"github.com/goravel/framework/support/convert"
+
+	"goravel/app/facades"
+	"goravel/app/services"
 )
 
 const owner = "goravel"

@@ -856,63 +856,6 @@ go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.
 			},
 			wantErr: nil,
 		},
-		{
-			name: "real mode - cleanup fails but doesn't affect result",
-			real: true,
-			setup: func() {
-				s.mockContext.EXPECT().Spinner("Creating upgrade PR for example...", mock.AnythingOfType("console.SpinnerOption")).
-					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
-						return opts.Action()
-					}).Once()
-
-				// Mock successful clone and mod
-				mockProcessResult := mocksprocess.NewResult(s.T())
-				mockProcessResult.EXPECT().Failed().Return(false).Once()
-				s.mockProcess.EXPECT().Run(`rm -rf example && git clone git@github.com:goravel/example.git &&
-cd example && git checkout master && git branch -D auto-upgrade/v1.16.0 2>/dev/null || true && git checkout -b auto-upgrade/v1.16.0 &&
-go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.4.0 && go mod tidy`).
-					Return(mockProcessResult).Once()
-
-				// Mock check status returns dirty working tree
-				mockProcessResult = mocksprocess.NewResult(s.T())
-				mockProcessResult.EXPECT().Failed().Return(false).Once()
-				mockProcessResult.EXPECT().Output().Return("modified: go.mod").Once()
-				s.mockProcess.EXPECT().Run(`cd example && git status`).Return(mockProcessResult).Once()
-
-				// Mock push branch succeeds
-				mockProcessResult = mocksprocess.NewResult(s.T())
-				mockProcessResult.EXPECT().Failed().Return(false).Once()
-				mockProcessResult.EXPECT().Output().Return("chore: Upgrade framework to v1.16.0 (auto)").Once()
-				s.mockProcess.EXPECT().Run(`cd example && git add . && git commit -m "chore: Upgrade framework to v1.16.0 (auto)" && git push origin auto-upgrade/v1.16.0 -f`).
-					Return(mockProcessResult).Once()
-
-				// Mock get pull requests returns no existing PR
-				s.mockGithub.EXPECT().GetPullRequests(owner, repo, &github.PullRequestListOptions{
-					State: "open",
-				}).Return([]*github.PullRequest{}, nil).Once()
-
-				// Mock create pull request succeeds
-				newPR := &github.PullRequest{
-					Title:   convert.Pointer(prTitle),
-					HTMLURL: convert.Pointer("https://github.com/goravel/example/pull/789"),
-					Number:  convert.Pointer(789),
-				}
-				s.mockGithub.EXPECT().CreatePullRequest(owner, repo, &github.NewPullRequest{
-					Title: convert.Pointer(prTitle),
-					Head:  convert.Pointer(upgradeBranch),
-					Base:  convert.Pointer("master"),
-				}).Return(newPR, nil).Once()
-
-				// Mock the cleanup call in defer fails
-				s.mockProcess.EXPECT().Run("rm -rf example").Return(nil).Once()
-			},
-			wantPR: &github.PullRequest{
-				Title:   convert.Pointer(prTitle),
-				HTMLURL: convert.Pointer("https://github.com/goravel/example/pull/789"),
-				Number:  convert.Pointer(789),
-			},
-			wantErr: nil,
-		},
 	}
 
 	for _, tt := range tests {
@@ -1863,27 +1806,6 @@ cd framework && git checkout master && git branch -D v1.16.x 2>/dev/null || true
 				s.mockProcess.EXPECT().Run(expectedCommand).Return(mockProcessResult).Once()
 
 				// Mock the cleanup call in defer
-				s.mockProcess.EXPECT().Run("rm -rf framework").Return(nil).Once()
-			},
-			wantErr: nil,
-		},
-		{
-			name: "real mode - cleanup fails but doesn't affect result",
-			real: true,
-			setup: func() {
-				s.mockContext.EXPECT().Spinner("Pushing branch v1.16.x for framework...", mock.AnythingOfType("console.SpinnerOption")).
-					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
-						return opts.Action()
-					}).Once()
-
-				// Mock the git command execution succeeds
-				expectedCommand := `rm -rf framework && git clone git@github.com:goravel/framework.git && 
-cd framework && git checkout master && git branch -D v1.16.x 2>/dev/null || true && git checkout -b v1.16.x && git push origin v1.16.x -f`
-				mockProcessResult := mocksprocess.NewResult(s.T())
-				mockProcessResult.EXPECT().Failed().Return(false).Once()
-				s.mockProcess.EXPECT().Run(expectedCommand).Return(mockProcessResult).Once()
-
-				// Mock the cleanup call in defer fails
 				s.mockProcess.EXPECT().Run("rm -rf framework").Return(nil).Once()
 			},
 			wantErr: nil,
