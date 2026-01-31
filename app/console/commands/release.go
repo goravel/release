@@ -78,7 +78,7 @@ func (r *Release) Major() error {
 		}
 	}
 
-	goravelReleaseInfo, err := r.getPackageReleaseInformation("goravel", frameworkTag)
+	goravelReleaseInfo, err := r.getPackageReleaseInformation("goravel-lite", frameworkTag)
 	if err != nil {
 		return err
 	}
@@ -137,24 +137,16 @@ func (r *Release) Major() error {
 		return err
 	}
 
-	exampleClientPR, err := r.createUpgradePRForExampleClient(frameworkTag, packageTag)
-	if err != nil {
-		return err
-	}
-
-	goravelPR, err := r.createUpgradePRForGoravel(frameworkTag, []string{
+	litePR, err := r.createUpgradePRForLite(frameworkTag, []string{
 		fmt.Sprintf("go get github.com/goravel/framework@%s", frameworkTag),
-		fmt.Sprintf("go get github.com/goravel/gin@%s", packageTag),
-		fmt.Sprintf("go get github.com/goravel/postgres@%s", packageTag),
 	})
 	if err != nil {
 		return err
 	}
 
 	if err := r.checkPRsMergeStatus(map[string]*github.PullRequest{
-		"example":        examplePR,
-		"example-client": exampleClientPR,
-		"goravel":        goravelPR,
+		"example":      examplePR,
+		"goravel-lite": litePR,
 	}); err != nil {
 		return fmt.Errorf("failed to check upgrade PRs merge status: %w", err)
 	}
@@ -169,7 +161,7 @@ func (r *Release) Major() error {
 			return err
 		}
 
-		if err := r.pushBranch("goravel", frameworkMajorTag); err != nil {
+		if err := r.pushBranch("goravel-lite", frameworkMajorTag); err != nil {
 			return err
 		}
 
@@ -203,7 +195,7 @@ func (r *Release) Patch() error {
 		}
 	}
 
-	goravelReleaseInfo, err := r.getPackageReleaseInformation("goravel", frameworkTag)
+	goravelReleaseInfo, err := r.getPackageReleaseInformation("goravel-lite", frameworkTag)
 	if err != nil {
 		return err
 	}
@@ -237,7 +229,7 @@ func (r *Release) Patch() error {
 		return err
 	}
 
-	goravelPR, err := r.createUpgradePRForGoravel(frameworkTag, []string{
+	litePR, err := r.createUpgradePRForLite(frameworkTag, []string{
 		fmt.Sprintf("go get github.com/goravel/framework@%s", frameworkTag),
 	})
 	if err != nil {
@@ -245,8 +237,8 @@ func (r *Release) Patch() error {
 	}
 
 	if err := r.checkPRsMergeStatus(map[string]*github.PullRequest{
-		"example": examplePR,
-		"goravel": goravelPR,
+		"example":      examplePR,
+		"goravel-lite": litePR,
 	}); err != nil {
 		return fmt.Errorf("failed to check upgrade PRs merge status: %w", err)
 	}
@@ -267,7 +259,7 @@ func (r *Release) Preview() error {
 	var releaseInfos []*ReleaseInformation
 
 	if frameworkTag != "" {
-		goravelReleaseInfo, err := r.getPackageReleaseInformation("goravel", frameworkTag)
+		liteReleaseInfo, err := r.getPackageReleaseInformation("goravel-lite", frameworkTag)
 		if err != nil {
 			return err
 		}
@@ -277,7 +269,7 @@ func (r *Release) Preview() error {
 			return err
 		}
 
-		releaseInfos = append(releaseInfos, goravelReleaseInfo, frameworkReleaseInfo)
+		releaseInfos = append(releaseInfos, liteReleaseInfo, frameworkReleaseInfo)
 	}
 
 	if packageTag != "" {
@@ -456,17 +448,8 @@ func (r *Release) createUpgradePRForExample(frameworkTag string, dependencies []
 	return r.createUpgradePR(repo, r.getBranchFromTag(repo, frameworkTag), frameworkTag, dependencies)
 }
 
-func (r *Release) createUpgradePRForExampleClient(frameworkTag, packageTag string) (*github.PullRequest, error) {
-	repo := "example-client"
-
-	return r.createUpgradePR(repo, r.getBranchFromTag(repo, frameworkTag), frameworkTag, []string{
-		fmt.Sprintf("go get github.com/goravel/framework@%s", frameworkTag),
-		fmt.Sprintf("go get github.com/goravel/gin@%s", packageTag),
-	})
-}
-
-func (r *Release) createUpgradePRForGoravel(frameworkTag string, dependencies []string) (*github.PullRequest, error) {
-	repo := "goravel"
+func (r *Release) createUpgradePRForLite(frameworkTag string, dependencies []string) (*github.PullRequest, error) {
+	repo := "goravel-lite"
 
 	return r.createUpgradePR(repo, r.getBranchFromTag(repo, frameworkTag), frameworkTag, dependencies)
 }

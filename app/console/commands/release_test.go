@@ -394,7 +394,7 @@ func (s *ReleaseTestSuite) Test_checkPRsMergeStatus() {
 
 func (s *ReleaseTestSuite) Test_createRelease() {
 	var (
-		repo   = "goravel"
+		repo   = "goravel-lite"
 		tag    = "v1.0.0"
 		branch = "v1.0.x"
 		notes  = &github.RepositoryReleaseNotes{
