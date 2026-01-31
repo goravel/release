@@ -31,11 +31,6 @@ func (r *Patch) Extend() command.Extend {
 				Aliases: []string{"f"},
 				Usage:   "Patch framework tag",
 			},
-			&command.StringFlag{
-				Name:    "packages",
-				Aliases: []string{"p"},
-				Usage:   "Patch packages tag",
-			},
 		},
 	}
 }
