@@ -25,21 +25,27 @@ func (r *Major) Description() string {
 func (r *Major) Extend() command.Extend {
 	return command.Extend{
 		Category: "release",
+		Arguments: []command.Argument{
+			&command.ArgumentString{
+				Name:     "tag",
+				Required: true,
+			},
+		},
 		Flags: []command.Flag{
-			&command.StringFlag{
-				Name:    "framework",
-				Aliases: []string{"f"},
-				Usage:   "Release framework tag",
-			},
-			&command.StringFlag{
-				Name:    "packages",
-				Aliases: []string{"p"},
-				Usage:   "Release packages tag",
-			},
 			&command.BoolFlag{
 				Name:    "real",
 				Aliases: []string{"r"},
 				Usage:   "Real release",
+			},
+			&command.BoolFlag{
+				Name:    "refresh",
+				Aliases: []string{},
+				Usage:   "Refresh Go module proxy cache before release",
+			},
+			&command.StringFlag{
+				Name:    "framework-branch",
+				Aliases: []string{"fb"},
+				Usage:   "Optional, release framework branch, sometimes go mod cannot fetch the latest master",
 			},
 		},
 	}

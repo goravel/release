@@ -7,7 +7,6 @@ toolchain go1.25.6
 tool github.com/vektra/mockery/v2
 
 require (
-	github.com/google/go-github/v81 v81.0.0
 	github.com/google/go-github/v82 v82.0.0
 	github.com/goravel/framework v1.16.1-0.20260113091405-aed3c54eb679
 	github.com/stretchr/testify v1.11.1
@@ -41,7 +40,7 @@ require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
-	github.com/gabriel-vasile/mimetype v1.4.12 // indirect
+	github.com/gabriel-vasile/mimetype v1.4.13 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect

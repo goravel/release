@@ -25,16 +25,10 @@ func (r *Preview) Description() string {
 func (r *Preview) Extend() command.Extend {
 	return command.Extend{
 		Category: "release",
-		Flags: []command.Flag{
-			&command.StringFlag{
-				Name:    "framework",
-				Aliases: []string{"f"},
-				Usage:   "Preview framework tag",
-			},
-			&command.StringFlag{
-				Name:    "packages",
-				Aliases: []string{"p"},
-				Usage:   "Preview packages tag",
+		Arguments: []command.Argument{
+			&command.ArgumentString{
+				Name:     "tag",
+				Required: true,
 			},
 		},
 	}

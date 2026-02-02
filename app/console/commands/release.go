@@ -30,6 +30,7 @@ var packages = []string{
 	"sqlite",
 	"redis",
 	"installer",
+	"goravel-lite",
 }
 
 type ReleaseInformation struct {
@@ -61,26 +62,35 @@ func NewRelease(ctx console.Context) *Release {
 }
 
 func (r *Release) Major() error {
-	r.real = r.ctx.OptionBool("real")
-	frameworkTag := r.ctx.Option("framework")
-	packageTag := r.ctx.Option("packages")
-
-	if frameworkTag == "" || packageTag == "" {
-		return fmt.Errorf("framework and packages tags are required, please use --framework and --packages to release")
+	if r.ctx.OptionBool("refresh") {
+		if err := r.refreshGoProxy(); err != nil {
+			r.ctx.Error(err.Error())
+			return nil
+		}
 	}
+
+	r.real = r.ctx.OptionBool("real")
+	frameworkTag := r.ctx.ArgumentString("tag")
+
+	var frameworkBranch string
+	if strings.HasSuffix(frameworkTag, ".0") {
+		frameworkBranch = strings.TrimSuffix(frameworkTag, ".0") + ".x"
+	}
+
+	packageTag := frameworkTag
+	packageBranch := frameworkBranch
 
 	if !r.ctx.Confirm("Did you test in sub-packages?") {
 		subPackages := append(packages, "example")
 		for _, pkg := range subPackages {
+			// frameworkBranch := "master"
+			// if fb := r.ctx.Option("framework-branch"); fb != "" {
+			// 	frameworkBranch = fb
+			// }
 			if err := r.testInSubPackage(pkg, "master", "master"); err != nil {
 				return err
 			}
 		}
-	}
-
-	goravelReleaseInfo, err := r.getPackageReleaseInformation("goravel-lite", frameworkTag)
-	if err != nil {
-		return err
 	}
 
 	frameworkReleaseInfo, err := r.getFrameworkReleaseInformation(frameworkTag)
@@ -94,7 +104,7 @@ func (r *Release) Major() error {
 	}
 
 	if !r.ctx.Confirm("Did you confirm the release information?") {
-		releaseInfos := append(packagesReleaseInfo, goravelReleaseInfo, frameworkReleaseInfo)
+		releaseInfos := append(packagesReleaseInfo, frameworkReleaseInfo)
 		if err := r.confirmReleaseInformations(releaseInfos); err != nil {
 			return err
 		}
@@ -117,6 +127,20 @@ func (r *Release) Major() error {
 		if err := r.releaseRepo(releaseInfo); err != nil {
 			return err
 		}
+
+		if releaseInfo.repo == "goravel-lite" {
+			if frameworkBranch != "" {
+				if err := r.pushBranch(releaseInfo.repo, frameworkBranch); err != nil {
+					return err
+				}
+			}
+		} else {
+			if packageBranch != "" {
+				if err := r.pushBranch(releaseInfo.repo, packageBranch); err != nil {
+					return err
+				}
+			}
+		}
 	}
 
 	examplePR, err := r.createUpgradePRForExample(frameworkTag, []string{
@@ -137,35 +161,18 @@ func (r *Release) Major() error {
 		return err
 	}
 
-	litePR, err := r.createUpgradePRForLite(frameworkTag, []string{
-		fmt.Sprintf("go get github.com/goravel/framework@%s", frameworkTag),
-	})
-	if err != nil {
-		return err
-	}
-
 	if err := r.checkPRsMergeStatus(map[string]*github.PullRequest{
-		"example":      examplePR,
-		"goravel-lite": litePR,
+		"example": examplePR,
 	}); err != nil {
 		return fmt.Errorf("failed to check upgrade PRs merge status: %w", err)
 	}
 
-	if err := r.releaseRepo(goravelReleaseInfo); err != nil {
-		return err
-	}
-
-	if strings.HasSuffix(frameworkTag, ".0") {
-		frameworkMajorTag := strings.TrimSuffix(frameworkTag, ".0") + ".x"
-		if err := r.pushBranch("framework", frameworkMajorTag); err != nil {
+	if frameworkBranch != "" {
+		if err := r.pushBranch("framework", frameworkBranch); err != nil {
 			return err
 		}
 
-		if err := r.pushBranch("goravel-lite", frameworkMajorTag); err != nil {
-			return err
-		}
-
-		if err := r.pushBranch("example", frameworkMajorTag); err != nil {
+		if err := r.pushBranch("example", frameworkBranch); err != nil {
 			return err
 		}
 	}
@@ -177,14 +184,9 @@ func (r *Release) Major() error {
 
 func (r *Release) Patch() error {
 	r.real = r.ctx.OptionBool("real")
-	frameworkTag := r.ctx.Option("framework")
-	packageBranch := r.ctx.Option("packages")
-
-	if frameworkTag == "" {
-		return fmt.Errorf("framework tag is required, please use --framework to release")
-	}
-
+	frameworkTag := r.ctx.ArgumentString("tag")
 	frameworkBranch := r.getBranchFromTag("framework", frameworkTag)
+	packageBranch := frameworkBranch
 
 	if !r.ctx.Confirm("Did you test in sub-packages?") {
 		subPackages := append(packages, "example")
@@ -253,8 +255,8 @@ func (r *Release) Patch() error {
 }
 
 func (r *Release) Preview() error {
-	frameworkTag := r.ctx.Option("framework")
-	packageTag := r.ctx.Option("packages")
+	frameworkTag := r.ctx.ArgumentString("tag")
+	packageTag := frameworkTag
 
 	var releaseInfos []*ReleaseInformation
 
@@ -779,11 +781,31 @@ cd %s && git checkout master && git branch -D %s 2>/dev/null || true && git chec
 				return fmt.Errorf("failed to push upgrade branch for %s: %w", repo, res.Error())
 			}
 
+			color.Green().Println(fmt.Sprintf("[%s/%s] Push %s branch success!", owner, repo, branch))
+
 			return nil
 		},
 	}); err != nil {
 		return err
 	}
+
+	return nil
+}
+
+func (r *Release) refreshGoProxy() error {
+	allPackages := append(packages, "framework", "example")
+	var links []string
+
+	for _, pkg := range allPackages {
+		links = append(links, fmt.Sprintf("curl https://proxy.golang.org/github.com/goravel/%s/@v/master.info", pkg))
+	}
+
+	command := strings.Join(links, " && ")
+	if res := facades.Process().Quietly().WithSpinner("Refreshing Go Proxy...").Run(command); res.Failed() {
+		return fmt.Errorf("Failed to refresh Go module proxy cache: %s", res.Error().Error())
+	}
+
+	color.Green().Println("Refreshed Go module proxy cache successfully")
 
 	return nil
 }
@@ -811,12 +833,14 @@ func (r *Release) releaseMajorSuccess(frameworkTag, packageTag string) {
 	r.ctx.NewLine()
 	color.Green().Println(fmt.Sprintf("Release goravel/framework %s and sub-packages %s success!", frameworkTag, packageTag))
 	color.Yellow().Println("The rest jobs:")
-	color.Black().Println(fmt.Sprintf("1. Set goravel/goravel %s as default branch: https://github.com/goravel/goravel/settings", frameworkTag))
-	color.Black().Println(fmt.Sprintf("2. Set goravel/example %s as default branch: https://github.com/goravel/example/settings", frameworkTag))
-	color.Black().Println("3. Install the new version via goravel/installer and test the project works fine")
-	color.Black().Println("4. Modify the support policy: https://www.goravel.dev/getting-started/releases.html#support-policy")
-	color.Black().Println("5. Merge the upgrade document PR (this step will be automated in the future): https://github.com/goravel/docs/pulls")
-	color.Black().Println("6. Switch the default branch if there are repositories that specify another branch as default branch")
+	color.Black().Println("1. Merge the goravel/goravel PR that is created by action based on goravel/goravel-lite: https://github.com/goravel/goravel/pulls")
+	color.Black().Println(fmt.Sprintf("2. Create the goravel/goravel %s branch: https://github.com/goravel/goravel/branches", frameworkTag))
+	color.Black().Println(fmt.Sprintf("3. Create the goravel/goravel %s release: https://github.com/goravel/goravel/releases", frameworkTag))
+	color.Black().Println(fmt.Sprintf("4. Set goravel/goravel %s as default branch: https://github.com/goravel/goravel/settings", frameworkTag))
+	color.Black().Println(fmt.Sprintf("5. Set goravel/goravel-lite %s as default branch: https://github.com/goravel/goravel-lite/settings", frameworkTag))
+	color.Black().Println(fmt.Sprintf("6. Set goravel/example %s as default branch: https://github.com/goravel/example/settings", frameworkTag))
+	color.Black().Println("7. Install the new version via goravel/installer and test the project works fine")
+	color.Black().Println("8. Modify the support policy: https://www.goravel.dev/getting-started/releases.html#support-policy")
 }
 
 func (r *Release) releasePatchSuccess(frameworkTag string) {
@@ -825,7 +849,7 @@ func (r *Release) releasePatchSuccess(frameworkTag string) {
 }
 
 func (r *Release) releaseSuccess(repo, tagName string) {
-	color.Green().Println(fmt.Sprintf("[%s/%s] release %s success!", owner, repo, tagName))
+	color.Green().Println(fmt.Sprintf("[%s/%s] Release %s success!", owner, repo, tagName))
 	color.Green().Println(fmt.Sprintf("Release link: https://github.com/%s/%s/releases/tag/%s", owner, repo, tagName))
 }
 
@@ -850,7 +874,7 @@ func (r *Release) testInSubPackage(pkg, frameworkBranch, packageBranch string) e
 	}
 
 	initCommand := fmt.Sprintf(`rm -rf %s && git clone git@github.com:goravel/%s.git && 
-				cd %s && git checkout %s && %s go mod tidy && go test ./...`, pkg, pkg, pkg, packageBranch, packages)
+				cd %s && git checkout %s && %s go mod tidy && cp .env.example .env 2>/dev/null || true && go test ./...`, pkg, pkg, pkg, packageBranch, packages)
 	if res := facades.Process().Run(initCommand); res.Failed() {
 		return fmt.Errorf("failed to test in %s: %w", pkg, res.Error())
 	}

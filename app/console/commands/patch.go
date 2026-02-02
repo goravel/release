@@ -25,17 +25,13 @@ func (r *Patch) Description() string {
 func (r *Patch) Extend() command.Extend {
 	return command.Extend{
 		Category: "release",
+		Arguments: []command.Argument{
+			&command.ArgumentString{
+				Name:     "tag",
+				Required: true,
+			},
+		},
 		Flags: []command.Flag{
-			&command.StringFlag{
-				Name:    "framework",
-				Aliases: []string{"f"},
-				Usage:   "Patch framework tag, e.g. v1.16.2",
-			},
-			&command.StringFlag{
-				Name:    "packages",
-				Aliases: []string{"p"},
-				Usage:   "Related packages branch, e.g. v1.4.x",
-			},
 			&command.BoolFlag{
 				Name:    "real",
 				Aliases: []string{"r"},
