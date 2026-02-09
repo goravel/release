@@ -3,7 +3,7 @@
 package services
 
 import (
-	github "github.com/google/go-github/v81/github"
+	github "github.com/google/go-github/v82/github"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -494,6 +494,54 @@ func (_c *Github_GetReleases_Call) Return(_a0 []*github.RepositoryRelease, _a1 e
 }
 
 func (_c *Github_GetReleases_Call) RunAndReturn(run func(string, string, *github.ListOptions) ([]*github.RepositoryRelease, error)) *Github_GetReleases_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SetDefaultBranch provides a mock function with given fields: owner, repo, branch
+func (_m *Github) SetDefaultBranch(owner string, repo string, branch string) error {
+	ret := _m.Called(owner, repo, branch)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetDefaultBranch")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, string, string) error); ok {
+		r0 = rf(owner, repo, branch)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// Github_SetDefaultBranch_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetDefaultBranch'
+type Github_SetDefaultBranch_Call struct {
+	*mock.Call
+}
+
+// SetDefaultBranch is a helper method to define mock.On call
+//   - owner string
+//   - repo string
+//   - branch string
+func (_e *Github_Expecter) SetDefaultBranch(owner interface{}, repo interface{}, branch interface{}) *Github_SetDefaultBranch_Call {
+	return &Github_SetDefaultBranch_Call{Call: _e.mock.On("SetDefaultBranch", owner, repo, branch)}
+}
+
+func (_c *Github_SetDefaultBranch_Call) Run(run func(owner string, repo string, branch string)) *Github_SetDefaultBranch_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *Github_SetDefaultBranch_Call) Return(_a0 error) *Github_SetDefaultBranch_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Github_SetDefaultBranch_Call) RunAndReturn(run func(string, string, string) error) *Github_SetDefaultBranch_Call {
 	_c.Call.Return(run)
 	return _c
 }

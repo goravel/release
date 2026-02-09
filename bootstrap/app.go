@@ -15,8 +15,10 @@ func Boot() contractsfoundation.Application {
 		WithConfig(config.Boot).
 		WithCommands(func() []console.Command {
 			return []console.Command{
-				commands.NewRelease(),
+				commands.NewMajor(),
+				commands.NewPatch(),
+				commands.NewPreview(),
 			}
 		}).
-		Start()
+		Create()
 }

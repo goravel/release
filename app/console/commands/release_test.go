@@ -1,14 +1,17 @@
 package commands
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
-	"github.com/google/go-github/v81/github"
+	"github.com/google/go-github/v82/github"
 	"github.com/goravel/framework/contracts/console"
 	mocksconsole "github.com/goravel/framework/mocks/console"
 	mocksclient "github.com/goravel/framework/mocks/http/client"
+	mocksprocess "github.com/goravel/framework/mocks/process"
 	"github.com/goravel/framework/support/convert"
+	testingmock "github.com/goravel/framework/testing/mock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -20,8 +23,8 @@ type ReleaseTestSuite struct {
 	suite.Suite
 	mockContext *mocksconsole.Context
 	mockGithub  *mocksservices.Github
-	mockProcess *mocksservices.Process
-	mockHttp    *mocksclient.Request
+	mockProcess *mocksprocess.Process
+	mockHttp    *mocksclient.Factory
 	release     *Release
 }
 
@@ -32,19 +35,19 @@ func TestReleaseTestSuite(t *testing.T) {
 func (s *ReleaseTestSuite) SetupTest() {
 	packages = []string{
 		"gin",
-		"fiber",
+		"goravel-lite",
 	}
 
+	mockFactory := testingmock.Factory()
 	s.mockContext = mocksconsole.NewContext(s.T())
 	s.mockGithub = mocksservices.NewGithub(s.T())
-	s.mockProcess = mocksservices.NewProcess(s.T())
-	s.mockHttp = mocksclient.NewRequest(s.T())
+	s.mockProcess = mockFactory.Process()
+	s.mockHttp = mockFactory.Http()
 
 	s.release = &Release{
-		real:    true,
-		github:  s.mockGithub,
-		process: s.mockProcess,
-		http:    s.mockHttp,
+		ctx:    s.mockContext,
+		real:   true,
+		github: s.mockGithub,
 	}
 }
 
@@ -73,10 +76,16 @@ func (s *ReleaseTestSuite) Test_checkPRMergeStatus() {
 			wantResult: true,
 		},
 		{
-			name:       "happy path - not real",
-			real:       false,
-			pr:         pr,
-			setup:      func() {},
+			name: "happy path - not real",
+			real: false,
+			pr:   pr,
+			setup: func() {
+				s.mockGithub.EXPECT().GetPullRequest(owner, repo, *pr.Number).Return(&github.PullRequest{
+					Number:  convert.Pointer(1),
+					HTMLURL: convert.Pointer("https://github.com/goravel/gin/pull/1"),
+					Merged:  convert.Pointer(true),
+				}, nil).Once()
+			},
 			wantResult: true,
 		},
 		{
@@ -383,7 +392,7 @@ func (s *ReleaseTestSuite) Test_checkPRsMergeStatus() {
 			beforeEach()
 			tt.setup()
 
-			err := s.release.checkPRsMergeStatus(s.mockContext, repoToPR)
+			err := s.release.checkPRsMergeStatus(repoToPR)
 
 			s.Equal(tt.wantErr, err)
 		})
@@ -392,7 +401,7 @@ func (s *ReleaseTestSuite) Test_checkPRsMergeStatus() {
 
 func (s *ReleaseTestSuite) Test_createRelease() {
 	var (
-		repo   = "goravel"
+		repo   = "goravel-lite"
 		tag    = "v1.0.0"
 		branch = "v1.0.x"
 		notes  = &github.RepositoryReleaseNotes{
@@ -408,9 +417,17 @@ func (s *ReleaseTestSuite) Test_createRelease() {
 		wantErr error
 	}{
 		{
-			name:  "happy path - not real",
-			real:  false,
-			setup: func() {},
+			name: "happy path - not real",
+			real: false,
+			setup: func() {
+				s.mockGithub.EXPECT().CheckBranchExists(owner, repo, branch).Return(true, nil).Once()
+				s.mockGithub.EXPECT().CreateRelease(owner, repo, &github.RepositoryRelease{
+					TagName:         convert.Pointer(tag),
+					TargetCommitish: convert.Pointer(branch),
+					Name:            convert.Pointer(notes.Name),
+					Body:            convert.Pointer(notes.Body),
+				}).Return(nil, nil).Once()
+			},
 		},
 		{
 			name: "happy path - real",
@@ -478,12 +495,14 @@ func (s *ReleaseTestSuite) Test_createUpgradePR() {
 					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
 						return opts.Action()
 					}).Once()
+
 				// Mock the cleanup call in defer
-				s.mockProcess.EXPECT().Run("rm -rf example").Return("", nil).Once()
+				s.mockProcess.EXPECT().Run("rm -rf example").Return(nil).Once()
 			},
 			wantPR: &github.PullRequest{
 				Title:   convert.Pointer(prTitle),
-				HTMLURL: convert.Pointer(fmt.Sprintf("https://github.com/%s/%s/pull/%s", owner, repo, upgradeBranch)),
+				HTMLURL: convert.Pointer("https://github.com/goravel/example/pull/auto-upgrade/v1.16.0"),
+				Number:  convert.Pointer(1),
 			},
 			wantErr: nil,
 		},
@@ -493,8 +512,9 @@ func (s *ReleaseTestSuite) Test_createUpgradePR() {
 			setup: func() {
 				s.mockContext.EXPECT().Spinner("Creating upgrade PR for example...", mock.AnythingOfType("console.SpinnerOption")).
 					Return(assert.AnError).Once()
+
 				// Mock the cleanup call in defer
-				s.mockProcess.EXPECT().Run("rm -rf example").Return("", nil).Once()
+				s.mockProcess.EXPECT().Run("rm -rf example").Return(nil).Once()
 			},
 			wantPR:  nil,
 			wantErr: assert.AnError,
@@ -509,13 +529,16 @@ func (s *ReleaseTestSuite) Test_createUpgradePR() {
 					}).Once()
 
 				// Mock the first process.Run call (clone and mod) to fail
+				mockProcessResult := mocksprocess.NewResult(s.T())
+				mockProcessResult.EXPECT().Failed().Return(true).Once()
+				mockProcessResult.EXPECT().Error().Return(assert.AnError).Once()
 				s.mockProcess.EXPECT().Run(`rm -rf example && git clone git@github.com:goravel/example.git &&
 cd example && git checkout master && git branch -D auto-upgrade/v1.16.0 2>/dev/null || true && git checkout -b auto-upgrade/v1.16.0 &&
 go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.4.0 && go mod tidy`).
-					Return("", assert.AnError).Once()
+					Return(mockProcessResult).Once()
 
 				// Mock the cleanup call in defer
-				s.mockProcess.EXPECT().Run("rm -rf example").Return("", nil).Once()
+				s.mockProcess.EXPECT().Run("rm -rf example").Return(nil).Once()
 			},
 			wantPR:  nil,
 			wantErr: fmt.Errorf("failed to clone repo and mod for example: %w", assert.AnError),
@@ -530,16 +553,21 @@ go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.
 					}).Once()
 
 				// Mock successful clone and mod
+				mockProcessResult := mocksprocess.NewResult(s.T())
+				mockProcessResult.EXPECT().Failed().Return(false).Once()
 				s.mockProcess.EXPECT().Run(`rm -rf example && git clone git@github.com:goravel/example.git &&
 cd example && git checkout master && git branch -D auto-upgrade/v1.16.0 2>/dev/null || true && git checkout -b auto-upgrade/v1.16.0 &&
 go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.4.0 && go mod tidy`).
-					Return("success", nil).Once()
+					Return(mockProcessResult).Once()
 
 				// Mock check status fails
-				s.mockProcess.EXPECT().Run(`cd example && git status`).Return("", assert.AnError).Once()
+				mockProcessResult = mocksprocess.NewResult(s.T())
+				mockProcessResult.EXPECT().Failed().Return(true).Once()
+				mockProcessResult.EXPECT().Error().Return(assert.AnError).Once()
+				s.mockProcess.EXPECT().Run(`cd example && git status`).Return(mockProcessResult).Once()
 
 				// Mock the cleanup call in defer
-				s.mockProcess.EXPECT().Run("rm -rf example").Return("", nil).Once()
+				s.mockProcess.EXPECT().Run("rm -rf example").Return(nil).Once()
 			},
 			wantPR:  nil,
 			wantErr: fmt.Errorf("failed to check status for example: %w", assert.AnError),
@@ -554,16 +582,21 @@ go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.
 					}).Once()
 
 				// Mock successful clone and mod
+				mockProcessResult := mocksprocess.NewResult(s.T())
+				mockProcessResult.EXPECT().Failed().Return(false).Once()
 				s.mockProcess.EXPECT().Run(`rm -rf example && git clone git@github.com:goravel/example.git &&
 cd example && git checkout master && git branch -D auto-upgrade/v1.16.0 2>/dev/null || true && git checkout -b auto-upgrade/v1.16.0 &&
 go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.4.0 && go mod tidy`).
-					Return("success", nil).Once()
+					Return(mockProcessResult).Once()
 
 				// Mock check status returns clean working tree
-				s.mockProcess.EXPECT().Run(`cd example && git status`).Return("nothing to commit, working tree clean", nil).Once()
+				mockProcessResult = mocksprocess.NewResult(s.T())
+				mockProcessResult.EXPECT().Failed().Return(false).Once()
+				mockProcessResult.EXPECT().Output().Return("nothing to commit, working tree clean").Once()
+				s.mockProcess.EXPECT().Run(`cd example && git status`).Return(mockProcessResult).Once()
 
 				// Mock the cleanup call in defer
-				s.mockProcess.EXPECT().Run("rm -rf example").Return("", nil).Once()
+				s.mockProcess.EXPECT().Run("rm -rf example").Return(nil).Once()
 			},
 			wantPR:  nil,
 			wantErr: nil,
@@ -578,20 +611,28 @@ go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.
 					}).Once()
 
 				// Mock successful clone and mod
+				mockProcessResult := mocksprocess.NewResult(s.T())
+				mockProcessResult.EXPECT().Failed().Return(false).Once()
 				s.mockProcess.EXPECT().Run(`rm -rf example && git clone git@github.com:goravel/example.git &&
 cd example && git checkout master && git branch -D auto-upgrade/v1.16.0 2>/dev/null || true && git checkout -b auto-upgrade/v1.16.0 &&
 go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.4.0 && go mod tidy`).
-					Return("success", nil).Once()
+					Return(mockProcessResult).Once()
 
 				// Mock check status returns dirty working tree
-				s.mockProcess.EXPECT().Run(`cd example && git status`).Return("modified: go.mod", nil).Once()
+				mockProcessResult = mocksprocess.NewResult(s.T())
+				mockProcessResult.EXPECT().Failed().Return(false).Once()
+				mockProcessResult.EXPECT().Output().Return("modified: go.mod").Once()
+				s.mockProcess.EXPECT().Run(`cd example && git status`).Return(mockProcessResult).Once()
 
 				// Mock push branch fails
+				mockProcessResult = mocksprocess.NewResult(s.T())
+				mockProcessResult.EXPECT().Failed().Return(true).Once()
+				mockProcessResult.EXPECT().Error().Return(assert.AnError).Once()
 				s.mockProcess.EXPECT().Run(`cd example && git add . && git commit -m "chore: Upgrade framework to v1.16.0 (auto)" && git push origin auto-upgrade/v1.16.0 -f`).
-					Return("", assert.AnError).Once()
+					Return(mockProcessResult).Once()
 
 				// Mock the cleanup call in defer
-				s.mockProcess.EXPECT().Run("rm -rf example").Return("", nil).Once()
+				s.mockProcess.EXPECT().Run("rm -rf example").Return(nil).Once()
 			},
 			wantPR:  nil,
 			wantErr: fmt.Errorf("failed to push upgrade branch for example: %w", assert.AnError),
@@ -606,23 +647,31 @@ go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.
 					}).Once()
 
 				// Mock successful clone and mod
+				mockProcessResult := mocksprocess.NewResult(s.T())
+				mockProcessResult.EXPECT().Failed().Return(false).Once()
 				s.mockProcess.EXPECT().Run(`rm -rf example && git clone git@github.com:goravel/example.git &&
 cd example && git checkout master && git branch -D auto-upgrade/v1.16.0 2>/dev/null || true && git checkout -b auto-upgrade/v1.16.0 &&
 go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.4.0 && go mod tidy`).
-					Return("success", nil).Once()
+					Return(mockProcessResult).Once()
 
 				// Mock check status returns dirty working tree
-				s.mockProcess.EXPECT().Run(`cd example && git status`).Return("modified: go.mod", nil).Once()
+				mockProcessResult = mocksprocess.NewResult(s.T())
+				mockProcessResult.EXPECT().Failed().Return(false).Once()
+				mockProcessResult.EXPECT().Output().Return("modified: go.mod").Once()
+				s.mockProcess.EXPECT().Run(`cd example && git status`).Return(mockProcessResult).Once()
 
 				// Mock push branch succeeds but output doesn't contain commit message
+				mockProcessResult = mocksprocess.NewResult(s.T())
+				mockProcessResult.EXPECT().Failed().Return(false).Once()
+				mockProcessResult.EXPECT().Output().Return("pushed to remote").Twice()
 				s.mockProcess.EXPECT().Run(`cd example && git add . && git commit -m "chore: Upgrade framework to v1.16.0 (auto)" && git push origin auto-upgrade/v1.16.0 -f`).
-					Return("pushed to remote", nil).Once()
+					Return(mockProcessResult).Once()
 
 				// Mock the cleanup call in defer
-				s.mockProcess.EXPECT().Run("rm -rf example").Return("", nil).Once()
+				s.mockProcess.EXPECT().Run("rm -rf example").Return(nil).Once()
 			},
 			wantPR:  nil,
-			wantErr: fmt.Errorf("failed to push upgrade branch for example: pushed to remote"),
+			wantErr: errors.New("failed to push upgrade branch for example: pushed to remote"),
 		},
 		{
 			name: "real mode - get pull requests fails",
@@ -634,17 +683,25 @@ go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.
 					}).Once()
 
 				// Mock successful clone and mod
+				mockProcessResult := mocksprocess.NewResult(s.T())
+				mockProcessResult.EXPECT().Failed().Return(false).Once()
 				s.mockProcess.EXPECT().Run(`rm -rf example && git clone git@github.com:goravel/example.git &&
 cd example && git checkout master && git branch -D auto-upgrade/v1.16.0 2>/dev/null || true && git checkout -b auto-upgrade/v1.16.0 &&
 go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.4.0 && go mod tidy`).
-					Return("success", nil).Once()
+					Return(mockProcessResult).Once()
 
 				// Mock check status returns dirty working tree
-				s.mockProcess.EXPECT().Run(`cd example && git status`).Return("modified: go.mod", nil).Once()
+				mockProcessResult = mocksprocess.NewResult(s.T())
+				mockProcessResult.EXPECT().Failed().Return(false).Once()
+				mockProcessResult.EXPECT().Output().Return("modified: go.mod").Once()
+				s.mockProcess.EXPECT().Run(`cd example && git status`).Return(mockProcessResult).Once()
 
 				// Mock push branch succeeds
+				mockProcessResult = mocksprocess.NewResult(s.T())
+				mockProcessResult.EXPECT().Failed().Return(false).Once()
+				mockProcessResult.EXPECT().Output().Return("chore: Upgrade framework to v1.16.0 (auto)").Once()
 				s.mockProcess.EXPECT().Run(`cd example && git add . && git commit -m "chore: Upgrade framework to v1.16.0 (auto)" && git push origin auto-upgrade/v1.16.0 -f`).
-					Return("chore: Upgrade framework to v1.16.0 (auto)", nil).Once()
+					Return(mockProcessResult).Once()
 
 				// Mock get pull requests fails
 				s.mockGithub.EXPECT().GetPullRequests(owner, repo, &github.PullRequestListOptions{
@@ -652,7 +709,7 @@ go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.
 				}).Return(nil, assert.AnError).Once()
 
 				// Mock the cleanup call in defer
-				s.mockProcess.EXPECT().Run("rm -rf example").Return("", nil).Once()
+				s.mockProcess.EXPECT().Run("rm -rf example").Return(nil).Once()
 			},
 			wantPR:  nil,
 			wantErr: assert.AnError,
@@ -667,17 +724,25 @@ go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.
 					}).Once()
 
 				// Mock successful clone and mod
+				mockProcessResult := mocksprocess.NewResult(s.T())
+				mockProcessResult.EXPECT().Failed().Return(false).Once()
 				s.mockProcess.EXPECT().Run(`rm -rf example && git clone git@github.com:goravel/example.git &&
 cd example && git checkout master && git branch -D auto-upgrade/v1.16.0 2>/dev/null || true && git checkout -b auto-upgrade/v1.16.0 &&
 go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.4.0 && go mod tidy`).
-					Return("success", nil).Once()
+					Return(mockProcessResult).Once()
 
 				// Mock check status returns dirty working tree
-				s.mockProcess.EXPECT().Run(`cd example && git status`).Return("modified: go.mod", nil).Once()
+				mockProcessResult = mocksprocess.NewResult(s.T())
+				mockProcessResult.EXPECT().Failed().Return(false).Once()
+				mockProcessResult.EXPECT().Output().Return("modified: go.mod").Once()
+				s.mockProcess.EXPECT().Run(`cd example && git status`).Return(mockProcessResult).Once()
 
 				// Mock push branch succeeds
+				mockProcessResult = mocksprocess.NewResult(s.T())
+				mockProcessResult.EXPECT().Failed().Return(false).Once()
+				mockProcessResult.EXPECT().Output().Return("chore: Upgrade framework to v1.16.0 (auto)").Once()
 				s.mockProcess.EXPECT().Run(`cd example && git add . && git commit -m "chore: Upgrade framework to v1.16.0 (auto)" && git push origin auto-upgrade/v1.16.0 -f`).
-					Return("chore: Upgrade framework to v1.16.0 (auto)", nil).Once()
+					Return(mockProcessResult).Once()
 
 				// Mock get pull requests returns existing PR
 				existingPR := &github.PullRequest{
@@ -690,7 +755,7 @@ go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.
 				}).Return([]*github.PullRequest{existingPR}, nil).Once()
 
 				// Mock the cleanup call in defer
-				s.mockProcess.EXPECT().Run("rm -rf example").Return("", nil).Once()
+				s.mockProcess.EXPECT().Run("rm -rf example").Return(nil).Once()
 			},
 			// Note: Due to variable shadowing bug in the actual implementation,
 			// the PR is found but not returned because the inner 'pr' variable
@@ -712,17 +777,25 @@ go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.
 					}).Once()
 
 				// Mock successful clone and mod
+				mockProcessResult := mocksprocess.NewResult(s.T())
+				mockProcessResult.EXPECT().Failed().Return(false).Once()
 				s.mockProcess.EXPECT().Run(`rm -rf example && git clone git@github.com:goravel/example.git &&
 cd example && git checkout master && git branch -D auto-upgrade/v1.16.0 2>/dev/null || true && git checkout -b auto-upgrade/v1.16.0 &&
 go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.4.0 && go mod tidy`).
-					Return("success", nil).Once()
+					Return(mockProcessResult).Once()
 
 				// Mock check status returns dirty working tree
-				s.mockProcess.EXPECT().Run(`cd example && git status`).Return("modified: go.mod", nil).Once()
+				mockProcessResult = mocksprocess.NewResult(s.T())
+				mockProcessResult.EXPECT().Failed().Return(false).Once()
+				mockProcessResult.EXPECT().Output().Return("modified: go.mod").Once()
+				s.mockProcess.EXPECT().Run(`cd example && git status`).Return(mockProcessResult).Once()
 
 				// Mock push branch succeeds
+				mockProcessResult = mocksprocess.NewResult(s.T())
+				mockProcessResult.EXPECT().Failed().Return(false).Once()
+				mockProcessResult.EXPECT().Output().Return("chore: Upgrade framework to v1.16.0 (auto)").Once()
 				s.mockProcess.EXPECT().Run(`cd example && git add . && git commit -m "chore: Upgrade framework to v1.16.0 (auto)" && git push origin auto-upgrade/v1.16.0 -f`).
-					Return("chore: Upgrade framework to v1.16.0 (auto)", nil).Once()
+					Return(mockProcessResult).Once()
 
 				// Mock get pull requests returns no existing PR
 				s.mockGithub.EXPECT().GetPullRequests(owner, repo, &github.PullRequestListOptions{
@@ -737,7 +810,7 @@ go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.
 				}).Return(nil, assert.AnError).Once()
 
 				// Mock the cleanup call in defer
-				s.mockProcess.EXPECT().Run("rm -rf example").Return("", nil).Once()
+				s.mockProcess.EXPECT().Run("rm -rf example").Return(nil).Once()
 			},
 			wantPR:  nil,
 			wantErr: assert.AnError,
@@ -752,17 +825,25 @@ go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.
 					}).Once()
 
 				// Mock successful clone and mod
+				mockProcessResult := mocksprocess.NewResult(s.T())
+				mockProcessResult.EXPECT().Failed().Return(false).Once()
 				s.mockProcess.EXPECT().Run(`rm -rf example && git clone git@github.com:goravel/example.git &&
 cd example && git checkout master && git branch -D auto-upgrade/v1.16.0 2>/dev/null || true && git checkout -b auto-upgrade/v1.16.0 &&
 go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.4.0 && go mod tidy`).
-					Return("success", nil).Once()
+					Return(mockProcessResult).Once()
 
 				// Mock check status returns dirty working tree
-				s.mockProcess.EXPECT().Run(`cd example && git status`).Return("modified: go.mod", nil).Once()
+				mockProcessResult = mocksprocess.NewResult(s.T())
+				mockProcessResult.EXPECT().Failed().Return(false).Once()
+				mockProcessResult.EXPECT().Output().Return("modified: go.mod").Once()
+				s.mockProcess.EXPECT().Run(`cd example && git status`).Return(mockProcessResult).Once()
 
 				// Mock push branch succeeds
+				mockProcessResult = mocksprocess.NewResult(s.T())
+				mockProcessResult.EXPECT().Failed().Return(false).Once()
+				mockProcessResult.EXPECT().Output().Return("chore: Upgrade framework to v1.16.0 (auto)").Once()
 				s.mockProcess.EXPECT().Run(`cd example && git add . && git commit -m "chore: Upgrade framework to v1.16.0 (auto)" && git push origin auto-upgrade/v1.16.0 -f`).
-					Return("chore: Upgrade framework to v1.16.0 (auto)", nil).Once()
+					Return(mockProcessResult).Once()
 
 				// Mock get pull requests returns no existing PR
 				s.mockGithub.EXPECT().GetPullRequests(owner, repo, &github.PullRequestListOptions{
@@ -782,61 +863,12 @@ go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.
 				}).Return(newPR, nil).Once()
 
 				// Mock the cleanup call in defer
-				s.mockProcess.EXPECT().Run("rm -rf example").Return("", nil).Once()
+				s.mockProcess.EXPECT().Run("rm -rf example").Return(nil).Once()
 			},
 			wantPR: &github.PullRequest{
 				Title:   convert.Pointer(prTitle),
 				HTMLURL: convert.Pointer("https://github.com/goravel/example/pull/456"),
 				Number:  convert.Pointer(456),
-			},
-			wantErr: nil,
-		},
-		{
-			name: "real mode - cleanup fails but doesn't affect result",
-			real: true,
-			setup: func() {
-				s.mockContext.EXPECT().Spinner("Creating upgrade PR for example...", mock.AnythingOfType("console.SpinnerOption")).
-					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
-						return opts.Action()
-					}).Once()
-
-				// Mock successful clone and mod
-				s.mockProcess.EXPECT().Run(`rm -rf example && git clone git@github.com:goravel/example.git &&
-cd example && git checkout master && git branch -D auto-upgrade/v1.16.0 2>/dev/null || true && git checkout -b auto-upgrade/v1.16.0 &&
-go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.4.0 && go mod tidy`).
-					Return("success", nil).Once()
-
-				// Mock check status returns dirty working tree
-				s.mockProcess.EXPECT().Run(`cd example && git status`).Return("modified: go.mod", nil).Once()
-
-				// Mock push branch succeeds
-				s.mockProcess.EXPECT().Run(`cd example && git add . && git commit -m "chore: Upgrade framework to v1.16.0 (auto)" && git push origin auto-upgrade/v1.16.0 -f`).
-					Return("chore: Upgrade framework to v1.16.0 (auto)", nil).Once()
-
-				// Mock get pull requests returns no existing PR
-				s.mockGithub.EXPECT().GetPullRequests(owner, repo, &github.PullRequestListOptions{
-					State: "open",
-				}).Return([]*github.PullRequest{}, nil).Once()
-
-				// Mock create pull request succeeds
-				newPR := &github.PullRequest{
-					Title:   convert.Pointer(prTitle),
-					HTMLURL: convert.Pointer("https://github.com/goravel/example/pull/789"),
-					Number:  convert.Pointer(789),
-				}
-				s.mockGithub.EXPECT().CreatePullRequest(owner, repo, &github.NewPullRequest{
-					Title: convert.Pointer(prTitle),
-					Head:  convert.Pointer(upgradeBranch),
-					Base:  convert.Pointer("master"),
-				}).Return(newPR, nil).Once()
-
-				// Mock the cleanup call in defer fails
-				s.mockProcess.EXPECT().Run("rm -rf example").Return("", assert.AnError).Once()
-			},
-			wantPR: &github.PullRequest{
-				Title:   convert.Pointer(prTitle),
-				HTMLURL: convert.Pointer("https://github.com/goravel/example/pull/789"),
-				Number:  convert.Pointer(789),
 			},
 			wantErr: nil,
 		},
@@ -847,7 +879,7 @@ go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.
 			s.release.real = tt.real
 			tt.setup()
 
-			pr, err := s.release.createUpgradePR(s.mockContext, repo, "master", frameworkTag, dependencies)
+			pr, err := s.release.createUpgradePR(repo, "master", frameworkTag, dependencies)
 
 			s.Equal(tt.wantPR, pr)
 			s.Equal(tt.wantErr, err)
@@ -876,155 +908,6 @@ func (s *ReleaseTestSuite) Test_getBranchFromTag() {
 	})
 }
 
-func (s *ReleaseTestSuite) Test_getFrameworkReleaseInformation() {
-	tag := "v1.16.0"
-	branch := "v1.16.x"
-
-	tests := []struct {
-		name    string
-		setup   func()
-		want    *ReleaseInformation
-		wantErr error
-	}{
-		{
-			name: "successful release information retrieval",
-			setup: func() {
-				// Mock spinner success
-				s.mockContext.EXPECT().Spinner("Getting framework release information for v1.16.0...", mock.AnythingOfType("console.SpinnerOption")).
-					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
-						return opts.Action()
-					}).Once()
-
-				// Mock getLatestTag success
-				s.mockGithub.EXPECT().GetLatestRelease(owner, "framework", tag).Return(&github.RepositoryRelease{
-					TagName: convert.Pointer("v1.15.0"),
-					Name:    convert.Pointer("Release v1.15.0"),
-				}, nil).Once()
-
-				// Mock getFrameworkCurrentTag success
-				mockResponse := mocksclient.NewResponse(s.T())
-				mockResponse.On("Body").Return(`package support
-
-const (
-	Version = "v1.16.0"
-	// other constants...
-)`, nil)
-				s.mockHttp.EXPECT().Get("https://raw.githubusercontent.com/goravel/framework/refs/heads/master/support/constant.go").
-					Return(mockResponse, nil).Once()
-
-				s.mockGithub.EXPECT().CheckBranchExists(owner, "framework", branch).Return(false, nil).Once()
-
-				// Mock generateReleaseNotes success
-				expectedNotes := &github.RepositoryReleaseNotes{
-					Name: "Release v1.16.0",
-					Body: "## What's Changed\n* Feature A\n* Bug fix B\n\n**Full Changelog**: https://github.com/goravel/framework/compare/v1.15.0...v1.16.0",
-				}
-				s.mockGithub.EXPECT().GenerateReleaseNotes(owner, "framework", &github.GenerateNotesOptions{
-					TagName:         "v1.16.0",
-					PreviousTagName: convert.Pointer("v1.15.0"),
-					TargetCommitish: convert.Pointer("master"),
-				}).Return(expectedNotes, nil).Once()
-			},
-			want: &ReleaseInformation{
-				currentTag: "v1.16.0",
-				latestTag:  "v1.15.0",
-				notes: &github.RepositoryReleaseNotes{
-					Name: "Release v1.16.0",
-					Body: "## What's Changed\n* Feature A\n* Bug fix B\n\n**Full Changelog**: https://github.com/goravel/framework/compare/v1.15.0...v1.16.0",
-				},
-				repo: "framework",
-				tag:  "v1.16.0",
-			},
-			wantErr: nil,
-		},
-		{
-			name: "spinner fails",
-			setup: func() {
-				s.mockContext.EXPECT().Spinner("Getting framework release information for v1.16.0...", mock.AnythingOfType("console.SpinnerOption")).
-					Return(assert.AnError).Once()
-			},
-			want:    nil,
-			wantErr: assert.AnError,
-		},
-		{
-			name: "getLatestTag fails",
-			setup: func() {
-				s.mockContext.EXPECT().Spinner("Getting framework release information for v1.16.0...", mock.AnythingOfType("console.SpinnerOption")).
-					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
-						return opts.Action()
-					}).Once()
-
-				s.mockGithub.EXPECT().GetLatestRelease(owner, "framework", tag).Return(nil, assert.AnError).Once()
-			},
-			want:    nil,
-			wantErr: assert.AnError,
-		},
-		{
-			name: "getFrameworkCurrentTag fails",
-			setup: func() {
-				s.mockContext.EXPECT().Spinner("Getting framework release information for v1.16.0...", mock.AnythingOfType("console.SpinnerOption")).
-					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
-						return opts.Action()
-					}).Once()
-
-				s.mockGithub.EXPECT().GetLatestRelease(owner, "framework", tag).Return(&github.RepositoryRelease{
-					TagName: convert.Pointer("v1.15.0"),
-				}, nil).Once()
-
-				s.mockGithub.EXPECT().CheckBranchExists(owner, "framework", branch).Return(false, nil).Once()
-
-				s.mockHttp.EXPECT().Get("https://raw.githubusercontent.com/goravel/framework/refs/heads/master/support/constant.go").
-					Return(nil, assert.AnError).Once()
-			},
-			want:    nil,
-			wantErr: assert.AnError,
-		},
-		{
-			name: "generateReleaseNotes fails",
-			setup: func() {
-				s.mockContext.EXPECT().Spinner("Getting framework release information for v1.16.0...", mock.AnythingOfType("console.SpinnerOption")).
-					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
-						return opts.Action()
-					}).Once()
-
-				s.mockGithub.EXPECT().GetLatestRelease(owner, "framework", tag).Return(&github.RepositoryRelease{
-					TagName: convert.Pointer("v1.15.0"),
-				}, nil).Once()
-
-				mockResponse := mocksclient.NewResponse(s.T())
-				mockResponse.On("Body").Return(`package support
-
-const (
-	Version = "v1.16.0"
-)`, nil)
-				s.mockHttp.EXPECT().Get("https://raw.githubusercontent.com/goravel/framework/refs/heads/master/support/constant.go").
-					Return(mockResponse, nil).Once()
-
-				s.mockGithub.EXPECT().CheckBranchExists(owner, "framework", branch).Return(false, nil).Once()
-
-				s.mockGithub.EXPECT().GenerateReleaseNotes(owner, "framework", &github.GenerateNotesOptions{
-					TagName:         "v1.16.0",
-					PreviousTagName: convert.Pointer("v1.15.0"),
-					TargetCommitish: convert.Pointer("master"),
-				}).Return(nil, assert.AnError).Once()
-			},
-			want:    nil,
-			wantErr: assert.AnError,
-		},
-	}
-
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			tt.setup()
-
-			result, err := s.release.getFrameworkReleaseInformation(s.mockContext, tag)
-
-			s.Equal(tt.want, result)
-			s.Equal(tt.wantErr, err)
-		})
-	}
-}
-
 func (s *ReleaseTestSuite) Test_getPackagesReleaseInformation() {
 	tag := "v1.4.0"
 	branch := "v1.4.x"
@@ -1036,14 +919,15 @@ func (s *ReleaseTestSuite) Test_getPackagesReleaseInformation() {
 	tests := []struct {
 		name    string
 		setup   func()
-		want    []*ReleaseInformation
+		want    map[string]*ReleaseInformation
 		wantErr error
 	}{
 		{
 			name: "successful retrieval for all packages",
 			setup: func() {
-				// Mock successful retrieval for all packages
-				for _, pkg := range packages {
+				// Mock successful retrieval for all packages (including framework)
+				allPackages := append(packages, "framework")
+				for _, pkg := range allPackages {
 					s.mockContext.EXPECT().Spinner(fmt.Sprintf("Getting %s release information for v1.4.0...", pkg), mock.AnythingOfType("console.SpinnerOption")).
 						RunAndReturn(func(msg string, opts console.SpinnerOption) error {
 							return opts.Action()
@@ -1055,33 +939,57 @@ func (s *ReleaseTestSuite) Test_getPackagesReleaseInformation() {
 						Name:    convert.Pointer(fmt.Sprintf("Release v1.3.0 for %s", pkg)),
 					}, nil).Once()
 
-					s.mockGithub.EXPECT().CheckBranchExists(owner, pkg, branch).Return(false, nil).Once()
+					if pkg == "framework" {
+						s.mockGithub.EXPECT().CheckBranchExists(owner, pkg, branch).Return(true, nil).Once()
+					} else {
+						s.mockGithub.EXPECT().CheckBranchExists(owner, pkg, branch).Return(false, nil).Once()
+					}
 
 					// Mock generateReleaseNotes success
 					expectedNotes := &github.RepositoryReleaseNotes{
 						Name: fmt.Sprintf("Release v1.4.0 for %s", pkg),
 						Body: fmt.Sprintf("## What's Changed\n* Feature A for %s\n* Bug fix B for %s\n\n**Full Changelog**: https://github.com/goravel/%s/compare/v1.3.0...v1.4.0", pkg, pkg, pkg),
 					}
-					s.mockGithub.EXPECT().GenerateReleaseNotes(owner, pkg, &github.GenerateNotesOptions{
-						TagName:         "v1.4.0",
-						PreviousTagName: convert.Pointer("v1.3.0"),
-						TargetCommitish: convert.Pointer("master"),
-					}).Return(expectedNotes, nil).Once()
+					if pkg == "framework" {
+						s.mockGithub.EXPECT().GenerateReleaseNotes(owner, pkg, &github.GenerateNotesOptions{
+							TagName:         "v1.4.0",
+							PreviousTagName: convert.Pointer("v1.3.0"),
+							TargetCommitish: convert.Pointer("v1.4.x"),
+						}).Return(expectedNotes, nil).Once()
+					} else {
+						s.mockGithub.EXPECT().GenerateReleaseNotes(owner, pkg, &github.GenerateNotesOptions{
+							TagName:         "v1.4.0",
+							PreviousTagName: convert.Pointer("v1.3.0"),
+							TargetCommitish: convert.Pointer("master"),
+						}).Return(expectedNotes, nil).Once()
+					}
 
 					if pkg == "installer" {
 						mockResponse := mocksclient.NewResponse(s.T())
-						mockResponse.On("Body").Return(`package support
+						mockResponse.EXPECT().Body().Return(`package support
 
 const Version string = "v1.4.0"`, nil)
 
 						s.mockHttp.EXPECT().Get("https://raw.githubusercontent.com/goravel/installer/refs/heads/master/support/constant.go").
 							Return(mockResponse, nil).Once()
 					}
+
+					if pkg == "framework" {
+						mockResponse := mocksclient.NewResponse(s.T())
+						mockResponse.EXPECT().Body().Return(`package support
+
+const Version string = "v1.4.0"`, nil)
+
+						s.mockGithub.EXPECT().CheckBranchExists(owner, "framework", "v1.4.x").Return(true, nil).Once()
+						s.mockHttp.EXPECT().Get("https://raw.githubusercontent.com/goravel/framework/refs/heads/v1.4.x/support/constant.go").
+							Return(mockResponse, nil).Once()
+					}
 				}
 			},
-			want: func() []*ReleaseInformation {
-				var result []*ReleaseInformation
-				for _, pkg := range packages {
+			want: func() map[string]*ReleaseInformation {
+				result := make(map[string]*ReleaseInformation)
+				allPackages := append(packages, "framework")
+				for _, pkg := range allPackages {
 					releaseInformation := &ReleaseInformation{
 						currentTag: "",
 						latestTag:  "v1.3.0",
@@ -1093,11 +1001,11 @@ const Version string = "v1.4.0"`, nil)
 						tag:  "v1.4.0",
 					}
 
-					if pkg == "installer" {
+					if pkg == "installer" || pkg == "framework" {
 						releaseInformation.currentTag = "v1.4.0"
 					}
 
-					result = append(result, releaseInformation)
+					result[pkg] = releaseInformation
 				}
 				return result
 			}(),
@@ -1106,7 +1014,7 @@ const Version string = "v1.4.0"`, nil)
 		{
 			name: "first package fails with getLatestTag error",
 			setup: func() {
-				// Mock spinner for first package
+				// Mock spinner for first package (gin)
 				s.mockContext.EXPECT().Spinner("Getting gin release information for v1.4.0...", mock.AnythingOfType("console.SpinnerOption")).
 					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
 						return opts.Action()
@@ -1175,7 +1083,7 @@ const Version string = "v1.4.0"`, nil)
 		{
 			name: "getLatestTag returns nil release - should succeed with empty latestTag",
 			setup: func() {
-				// Mock for first package only since we're testing early termination
+				// Mock for first package (gin)
 				s.mockContext.EXPECT().Spinner("Getting gin release information for v1.4.0...", mock.AnythingOfType("console.SpinnerOption")).
 					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
 						return opts.Action()
@@ -1195,7 +1103,7 @@ const Version string = "v1.4.0"`, nil)
 					Body: "## What's Changed\n* Feature A for gin",
 				}, nil).Once()
 
-				// Mock for second package to complete the test
+				// Mock for second package (installer)
 				s.mockContext.EXPECT().Spinner("Getting installer release information for v1.4.0...", mock.AnythingOfType("console.SpinnerOption")).
 					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
 						return opts.Action()
@@ -1217,17 +1125,47 @@ const Version string = "v1.4.0"`, nil)
 				}, nil).Once()
 
 				mockResponse := mocksclient.NewResponse(s.T())
-				mockResponse.On("Body").Return(`package support
+				mockResponse.EXPECT().Body().Return(`package support
 
 const Version string = "v1.4.0"`, nil)
 
 				s.mockHttp.EXPECT().Get("https://raw.githubusercontent.com/goravel/installer/refs/heads/master/support/constant.go").
 					Return(mockResponse, nil).Once()
+
+				// Mock for third package (framework)
+				s.mockContext.EXPECT().Spinner("Getting framework release information for v1.4.0...", mock.AnythingOfType("console.SpinnerOption")).
+					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
+						return opts.Action()
+					}).Once()
+
+				s.mockGithub.EXPECT().GetLatestRelease(owner, "framework", tag).Return(&github.RepositoryRelease{
+					TagName: convert.Pointer("v1.3.0"),
+				}, nil).Once()
+
+				s.mockGithub.EXPECT().CheckBranchExists(owner, "framework", branch).Return(true, nil).Once()
+
+				s.mockGithub.EXPECT().GenerateReleaseNotes(owner, "framework", &github.GenerateNotesOptions{
+					TagName:         "v1.4.0",
+					PreviousTagName: convert.Pointer("v1.3.0"),
+					TargetCommitish: convert.Pointer("v1.4.x"),
+				}).Return(&github.RepositoryReleaseNotes{
+					Name: "Release v1.4.0 for framework",
+					Body: "## What's Changed\n* Feature A for framework",
+				}, nil).Once()
+
+				mockResponse2 := mocksclient.NewResponse(s.T())
+				mockResponse2.EXPECT().Body().Return(`package support
+
+const Version string = "v1.4.0"`, nil)
+
+				s.mockGithub.EXPECT().CheckBranchExists(owner, "framework", "v1.4.x").Return(true, nil).Once()
+				s.mockHttp.EXPECT().Get("https://raw.githubusercontent.com/goravel/framework/refs/heads/v1.4.x/support/constant.go").
+					Return(mockResponse2, nil).Once()
 			},
-			want: func() []*ReleaseInformation {
-				var result []*ReleaseInformation
+			want: func() map[string]*ReleaseInformation {
+				result := make(map[string]*ReleaseInformation)
 				// First package with empty latestTag
-				result = append(result, &ReleaseInformation{
+				result["gin"] = &ReleaseInformation{
 					currentTag: "",
 					latestTag:  "",
 					notes: &github.RepositoryReleaseNotes{
@@ -1236,9 +1174,9 @@ const Version string = "v1.4.0"`, nil)
 					},
 					repo: "gin",
 					tag:  "v1.4.0",
-				})
+				}
 				// Second package
-				result = append(result, &ReleaseInformation{
+				result["installer"] = &ReleaseInformation{
 					currentTag: "v1.4.0",
 					latestTag:  "v1.3.0",
 					notes: &github.RepositoryReleaseNotes{
@@ -1247,7 +1185,18 @@ const Version string = "v1.4.0"`, nil)
 					},
 					repo: "installer",
 					tag:  "v1.4.0",
-				})
+				}
+				// Third package
+				result["framework"] = &ReleaseInformation{
+					currentTag: "v1.4.0",
+					latestTag:  "v1.3.0",
+					notes: &github.RepositoryReleaseNotes{
+						Name: "Release v1.4.0 for framework",
+						Body: "## What's Changed\n* Feature A for framework",
+					},
+					repo: "framework",
+					tag:  "v1.4.0",
+				}
 				return result
 			}(),
 			wantErr: nil,
@@ -1258,7 +1207,7 @@ const Version string = "v1.4.0"`, nil)
 		s.Run(tt.name, func() {
 			tt.setup()
 
-			result, err := s.release.getPackagesReleaseInformation(s.mockContext, tag)
+			result, err := s.release.getPackagesReleaseInformation(tag)
 
 			s.Equal(tt.want, result)
 			s.Equal(tt.wantErr, err)
@@ -1277,7 +1226,7 @@ func (s *ReleaseTestSuite) Test_getCurrentTag() {
 			name: "successful version extraction",
 			setup: func() {
 				mockResponse := mocksclient.NewResponse(s.T())
-				mockResponse.On("Body").Return(`package support
+				mockResponse.EXPECT().Body().Return(`package support
 
 const (
 	Version = "v1.16.0"
@@ -1294,7 +1243,7 @@ const (
 			name: "version with different spacing",
 			setup: func() {
 				mockResponse := mocksclient.NewResponse(s.T())
-				mockResponse.On("Body").Return(`package support
+				mockResponse.EXPECT().Body().Return(`package support
 
 const (
 	Version="v1.16.0"
@@ -1311,7 +1260,7 @@ const (
 			name: "version with extra whitespace",
 			setup: func() {
 				mockResponse := mocksclient.NewResponse(s.T())
-				mockResponse.On("Body").Return(`package support
+				mockResponse.EXPECT().Body().Return(`package support
 
 const (
 	Version   =   "v1.16.0"
@@ -1328,7 +1277,7 @@ const (
 			name: "version with tabs",
 			setup: func() {
 				mockResponse := mocksclient.NewResponse(s.T())
-				mockResponse.On("Body").Return(`package support
+				mockResponse.EXPECT().Body().Return(`package support
 
 const (
 	Version	=	"v1.16.0"
@@ -1345,7 +1294,7 @@ const (
 			name: "version with complex version string",
 			setup: func() {
 				mockResponse := mocksclient.NewResponse(s.T())
-				mockResponse.On("Body").Return(`package support
+				mockResponse.EXPECT().Body().Return(`package support
 
 const (
 	Version = "v1.16.0-beta.1+meta"
@@ -1371,7 +1320,7 @@ const (
 			name: "response body reading fails",
 			setup: func() {
 				mockResponse := mocksclient.NewResponse(s.T())
-				mockResponse.On("Body").Return("", assert.AnError)
+				mockResponse.EXPECT().Body().Return("", assert.AnError)
 
 				s.mockHttp.EXPECT().Get("https://raw.githubusercontent.com/goravel/framework/refs/heads/master/support/constant.go").
 					Return(mockResponse, nil).Once()
@@ -1383,7 +1332,7 @@ const (
 			name: "no version constant found",
 			setup: func() {
 				mockResponse := mocksclient.NewResponse(s.T())
-				mockResponse.On("Body").Return(`package support
+				mockResponse.EXPECT().Body().Return(`package support
 
 const (
 	// No Version constant here
@@ -1733,8 +1682,9 @@ func (s *ReleaseTestSuite) Test_pushBranch() {
 					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
 						return opts.Action()
 					}).Once()
+
 				// Mock the cleanup call in defer
-				s.mockProcess.EXPECT().Run("rm -rf framework").Return("", nil).Once()
+				s.mockProcess.EXPECT().Run("rm -rf framework").Return(nil).Once()
 			},
 			wantErr: nil,
 		},
@@ -1744,8 +1694,9 @@ func (s *ReleaseTestSuite) Test_pushBranch() {
 			setup: func() {
 				s.mockContext.EXPECT().Spinner("Pushing branch v1.16.x for framework...", mock.AnythingOfType("console.SpinnerOption")).
 					Return(assert.AnError).Once()
+
 				// Mock the cleanup call in defer
-				s.mockProcess.EXPECT().Run("rm -rf framework").Return("", nil).Once()
+				s.mockProcess.EXPECT().Run("rm -rf framework").Return(nil).Once()
 			},
 			wantErr: assert.AnError,
 		},
@@ -1761,10 +1712,13 @@ func (s *ReleaseTestSuite) Test_pushBranch() {
 				// Mock the git command execution fails
 				expectedCommand := `rm -rf framework && git clone git@github.com:goravel/framework.git && 
 cd framework && git checkout master && git branch -D v1.16.x 2>/dev/null || true && git checkout -b v1.16.x && git push origin v1.16.x -f`
-				s.mockProcess.EXPECT().Run(expectedCommand).Return("", assert.AnError).Once()
+				mockProcessResult := mocksprocess.NewResult(s.T())
+				mockProcessResult.EXPECT().Failed().Return(true).Once()
+				mockProcessResult.EXPECT().Error().Return(assert.AnError).Once()
+				s.mockProcess.EXPECT().Run(expectedCommand).Return(mockProcessResult).Once()
 
 				// Mock the cleanup call in defer
-				s.mockProcess.EXPECT().Run("rm -rf framework").Return("", nil).Once()
+				s.mockProcess.EXPECT().Run("rm -rf framework").Return(nil).Once()
 			},
 			wantErr: fmt.Errorf("failed to push upgrade branch for framework: %w", assert.AnError),
 		},
@@ -1780,29 +1734,12 @@ cd framework && git checkout master && git branch -D v1.16.x 2>/dev/null || true
 				// Mock the git command execution succeeds with output containing branch name
 				expectedCommand := `rm -rf framework && git clone git@github.com:goravel/framework.git && 
 cd framework && git checkout master && git branch -D v1.16.x 2>/dev/null || true && git checkout -b v1.16.x && git push origin v1.16.x -f`
-				s.mockProcess.EXPECT().Run(expectedCommand).Return("pushed v1.16.x to origin", nil).Once()
+				mockProcessResult := mocksprocess.NewResult(s.T())
+				mockProcessResult.EXPECT().Failed().Return(false).Once()
+				s.mockProcess.EXPECT().Run(expectedCommand).Return(mockProcessResult).Once()
 
 				// Mock the cleanup call in defer
-				s.mockProcess.EXPECT().Run("rm -rf framework").Return("", nil).Once()
-			},
-			wantErr: nil,
-		},
-		{
-			name: "real mode - cleanup fails but doesn't affect result",
-			real: true,
-			setup: func() {
-				s.mockContext.EXPECT().Spinner("Pushing branch v1.16.x for framework...", mock.AnythingOfType("console.SpinnerOption")).
-					RunAndReturn(func(msg string, opts console.SpinnerOption) error {
-						return opts.Action()
-					}).Once()
-
-				// Mock the git command execution succeeds
-				expectedCommand := `rm -rf framework && git clone git@github.com:goravel/framework.git && 
-cd framework && git checkout master && git branch -D v1.16.x 2>/dev/null || true && git checkout -b v1.16.x && git push origin v1.16.x -f`
-				s.mockProcess.EXPECT().Run(expectedCommand).Return("pushed v1.16.x to origin", nil).Once()
-
-				// Mock the cleanup call in defer fails
-				s.mockProcess.EXPECT().Run("rm -rf framework").Return("", assert.AnError).Once()
+				s.mockProcess.EXPECT().Run("rm -rf framework").Return(nil).Once()
 			},
 			wantErr: nil,
 		},
@@ -1813,7 +1750,7 @@ cd framework && git checkout master && git branch -D v1.16.x 2>/dev/null || true
 			s.release.real = tt.real
 			tt.setup()
 
-			err := s.release.pushBranch(s.mockContext, repo, branch)
+			err := s.release.pushBranch(repo, branch)
 
 			s.Equal(tt.wantErr, err)
 		})
@@ -1935,7 +1872,7 @@ func (s *ReleaseTestSuite) Test_releaseRepo() {
 		s.Run(tt.name, func() {
 			tt.setup()
 
-			err := s.release.releaseRepo(s.mockContext, tt.releaseInfo)
+			err := s.release.releaseRepo(tt.releaseInfo)
 
 			s.Equal(tt.wantErr, err)
 		})
