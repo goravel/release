@@ -698,7 +698,7 @@ func (r *Release) refreshGoProxy() error {
 
 	command := strings.Join(links, " && ")
 	if res := facades.Process().Quietly().WithSpinner("Refreshing Go Proxy...").Run(command); res.Failed() {
-		return fmt.Errorf("Failed to refresh Go module proxy cache: %s", res.Error().Error())
+		return fmt.Errorf("failed to refresh Go module proxy cache: %s", res.Error().Error())
 	}
 
 	color.Green().Println("Refreshed Go module proxy cache successfully")

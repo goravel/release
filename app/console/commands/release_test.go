@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
@@ -495,24 +496,14 @@ func (s *ReleaseTestSuite) Test_createUpgradePR() {
 						return opts.Action()
 					}).Once()
 
-				// Mock successful clone and mod
-				mockProcessResult := mocksprocess.NewResult(s.T())
-				mockProcessResult.EXPECT().Failed().Return(false).Once()
-				s.mockProcess.EXPECT().Run(`rm -rf example && git clone git@github.com:goravel/example.git &&
-cd example && git checkout master && git branch -D auto-upgrade/v1.16.0 2>/dev/null || true && git checkout -b auto-upgrade/v1.16.0 &&
-go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.4.0 && go mod tidy`).
-					Return(mockProcessResult).Once()
-
-				// Mock check status returns clean working tree
-				mockProcessResult = mocksprocess.NewResult(s.T())
-				mockProcessResult.EXPECT().Failed().Return(false).Once()
-				mockProcessResult.EXPECT().Output().Return("nothing to commit, working tree clean").Once()
-				s.mockProcess.EXPECT().Run(`cd example && git status`).Return(mockProcessResult).Once()
-
 				// Mock the cleanup call in defer
 				s.mockProcess.EXPECT().Run("rm -rf example").Return(nil).Once()
 			},
-			wantPR:  nil,
+			wantPR: &github.PullRequest{
+				Title:   convert.Pointer(prTitle),
+				HTMLURL: convert.Pointer("https://github.com/goravel/example/pull/auto-upgrade/v1.16.0"),
+				Number:  convert.Pointer(1),
+			},
 			wantErr: nil,
 		},
 		{
@@ -680,7 +671,7 @@ go get github.com/goravel/framework@v1.16.0 && go get github.com/goravel/gin@v1.
 				s.mockProcess.EXPECT().Run("rm -rf example").Return(nil).Once()
 			},
 			wantPR:  nil,
-			wantErr: fmt.Errorf("failed to push upgrade branch for example: pushed to remote"),
+			wantErr: errors.New("failed to push upgrade branch for example: pushed to remote"),
 		},
 		{
 			name: "real mode - get pull requests fails",
