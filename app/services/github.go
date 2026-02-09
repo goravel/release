@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/google/go-github/v81/github"
+	"github.com/goravel/framework/support/color"
+	"github.com/goravel/framework/support/convert"
 
 	"goravel/app/facades"
 )
@@ -32,14 +34,17 @@ type Github interface {
 	GetPullRequests(owner, repo string, opts *github.PullRequestListOptions) ([]*github.PullRequest, error)
 	// GetReleases lists releases for a repository
 	GetReleases(owner, repo string, opts *github.ListOptions) ([]*github.RepositoryRelease, error)
+	// SetDefaultBranch sets the default branch for a repository
+	SetDefaultBranch(owner, repo, branch string) error
 }
 
 type GithubImpl struct {
 	ctx    context.Context
 	client *github.Client
+	real   bool
 }
 
-func NewGithubImpl(ctx context.Context) *GithubImpl {
+func NewGithubImpl(real bool) *GithubImpl {
 	token := facades.Config().GetString("GITHUB_TOKEN")
 	if token == "" {
 		panic("github token is not set")
@@ -47,7 +52,7 @@ func NewGithubImpl(ctx context.Context) *GithubImpl {
 
 	client := github.NewClient(nil).WithAuthToken(token)
 
-	return &GithubImpl{ctx: ctx, client: client}
+	return &GithubImpl{ctx: context.Background(), client: client, real: real}
 }
 
 func (r *GithubImpl) CheckBranchExists(owner, repo, branch string) (bool, error) {
@@ -70,6 +75,14 @@ func (r *GithubImpl) CheckBranchExists(owner, repo, branch string) (bool, error)
 }
 
 func (r *GithubImpl) CreatePullRequest(owner, repo string, pr *github.NewPullRequest) (*github.PullRequest, error) {
+	if !r.real {
+		color.Yellow().Println(fmt.Sprintf("Preview mode, skip creating pull request for %s/%s", owner, repo))
+		return &github.PullRequest{
+			Title:   pr.Title,
+			HTMLURL: convert.Pointer(fmt.Sprintf("https://github.com/%s/%s/pull/fake", owner, repo)),
+		}, nil
+	}
+
 	pullRequest, response, err := r.client.PullRequests.Create(r.ctx, owner, repo, pr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create pull request for %s/%s: %w", owner, repo, err)
@@ -81,6 +94,11 @@ func (r *GithubImpl) CreatePullRequest(owner, repo string, pr *github.NewPullReq
 }
 
 func (r *GithubImpl) CreateRelease(owner, repo string, release *github.RepositoryRelease) (*github.RepositoryRelease, error) {
+	if !r.real {
+		color.Yellow().Println(fmt.Sprintf("Preview mode, skip creating release for %s/%s", owner, repo))
+		return nil, nil
+	}
+
 	createdRelease, response, err := r.client.Repositories.CreateRelease(r.ctx, owner, repo, release)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create release for %s/%s: %w", owner, repo, err)
@@ -140,6 +158,13 @@ func (r *GithubImpl) GetLatestRelease(owner, repo, tag string) (*github.Reposito
 }
 
 func (r *GithubImpl) GetPullRequest(owner, repo string, number int) (*github.PullRequest, error) {
+	if !r.real {
+		color.Yellow().Println(fmt.Sprintf("Preview mode, skip getting pull request %d for %s/%s", number, owner, repo))
+		return &github.PullRequest{
+			Merged: convert.Pointer(true),
+		}, nil
+	}
+
 	pr, response, err := r.client.PullRequests.Get(r.ctx, owner, repo, number)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get pull request %d for %s/%s: %w", number, owner, repo, err)
@@ -151,6 +176,11 @@ func (r *GithubImpl) GetPullRequest(owner, repo string, number int) (*github.Pul
 }
 
 func (r *GithubImpl) GetPullRequests(owner, repo string, opts *github.PullRequestListOptions) ([]*github.PullRequest, error) {
+	if !r.real {
+		color.Yellow().Println(fmt.Sprintf("Preview mode, skip listing pull requests for %s/%s", owner, repo))
+		return nil, nil
+	}
+
 	prs, response, err := r.client.PullRequests.List(r.ctx, owner, repo, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list pull requests for %s/%s: %w", owner, repo, err)
@@ -170,4 +200,22 @@ func (r *GithubImpl) GetReleases(owner, repo string, opts *github.ListOptions) (
 		return nil, fmt.Errorf("failed to list releases for %s/%s: %s", owner, repo, response.Status)
 	}
 	return releases, nil
+}
+
+func (r *GithubImpl) SetDefaultBranch(owner, repo, branch string) error {
+	if !r.real {
+		color.Yellow().Println(fmt.Sprintf("Preview mode, skip setting default branch for %s/%s to %s", owner, repo, branch))
+		return nil
+	}
+
+	_, response, err := r.client.Repositories.Edit(r.ctx, owner, repo, &github.Repository{
+		DefaultBranch: convert.Pointer(branch),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to set default branch for %s/%s: %w", owner, repo, err)
+	}
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to set default branch for %s/%s: %s", owner, repo, response.Status)
+	}
+	return nil
 }

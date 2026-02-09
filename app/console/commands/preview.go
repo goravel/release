@@ -31,6 +31,14 @@ func (r *Preview) Extend() command.Extend {
 				Required: true,
 			},
 		},
+		Flags: []command.Flag{
+			&command.BoolFlag{
+				Name:    "packages",
+				Usage:   "Whether to preview all packages' changes.",
+				Value:   false,
+				Aliases: []string{"p"},
+			},
+		},
 	}
 }
 
