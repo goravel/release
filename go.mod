@@ -8,7 +8,7 @@ tool github.com/vektra/mockery/v2
 
 require (
 	github.com/google/go-github/v82 v82.0.0
-	github.com/goravel/framework v1.16.1-0.20260113091405-aed3c54eb679
+	github.com/goravel/framework v1.17.0
 	github.com/stretchr/testify v1.11.1
 )
 
