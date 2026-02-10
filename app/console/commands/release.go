@@ -213,31 +213,7 @@ func (r *Release) Preview() error {
 	}
 
 	for _, releaseInfo := range releaseInfos {
-		r.divider()
-		color.Yellow().Println(fmt.Sprintf("Please check %s/%s information:", owner, releaseInfo.repo))
-		r.ctx.NewLine()
-
-		color.Black().Print("The latest tag is:             ")
-		color.Red().Println(releaseInfo.latestTag)
-
-		color.Black().Print("The tag to release is:         ")
-		color.Red().Println(releaseInfo.tag)
-
-		if releaseInfo.currentTag != "" {
-			color.Black().Print("The current tag in code is:    ")
-			color.Red().Println(releaseInfo.currentTag)
-
-			if releaseInfo.currentTag != releaseInfo.tag {
-				r.ctx.NewLine()
-				color.Red().Println("The current tag is not the same as the tag to release")
-			}
-		}
-
-		r.ctx.NewLine()
-		color.Black().Println(releaseInfo.notes.Name)
-		color.Black().Println(releaseInfo.notes.Body)
-
-		r.ctx.NewLine()
+		r.printReleaseInformation(releaseInfo)
 	}
 
 	return nil
@@ -324,31 +300,8 @@ func (r *Release) checkPRMergeStatus(repo string, pr *github.PullRequest) (bool,
 
 func (r *Release) confirmReleaseInformation(pkgToReleaseInfo map[string]*ReleaseInformation) error {
 	for _, releaseInfo := range pkgToReleaseInfo {
-		r.divider()
-		color.Yellow().Println(fmt.Sprintf("Please check %s/%s information:", owner, releaseInfo.repo))
-		r.ctx.NewLine()
+		r.printReleaseInformation(releaseInfo)
 
-		color.Black().Print("The latest tag is:             ")
-		color.Red().Println(releaseInfo.latestTag)
-
-		color.Black().Print("The tag to release is:         ")
-		color.Red().Println(releaseInfo.tag)
-
-		if releaseInfo.currentTag != "" {
-			color.Black().Print("The current tag in code is:    ")
-			color.Red().Println(releaseInfo.currentTag)
-
-			if releaseInfo.currentTag != releaseInfo.tag {
-				r.ctx.NewLine()
-				color.Red().Println("The current tag is not the same as the tag to release")
-			}
-		}
-
-		r.ctx.NewLine()
-		color.Black().Println(releaseInfo.notes.Name)
-		color.Black().Println(releaseInfo.notes.Body)
-
-		r.ctx.NewLine()
 		if !r.ctx.Confirm(fmt.Sprintf("%s/%s confirmed?", owner, releaseInfo.repo)) {
 			return fmt.Errorf("%s/%s not confirmed", owner, releaseInfo.repo)
 		}
@@ -510,37 +463,19 @@ func (r *Release) getBranchFromTag(repo, tag string) string {
 }
 
 func (r *Release) getPackagesReleaseInformation(tag string) (map[string]*ReleaseInformation, error) {
-	pkgToReleaseInfo := make(map[string]*ReleaseInformation, 0)
+	repoToReleaseInfo := make(map[string]*ReleaseInformation, 0)
 	allPackages := append(packages, "framework")
 
-	for _, pkg := range allPackages {
-		releaseInfo, err := r.getPackageReleaseInformation(pkg, tag)
+	for _, repo := range allPackages {
+		releaseInfo, err := r.getPackageReleaseInformation(repo, tag)
 		if err != nil {
 			return nil, err
 		}
 
-		if pkg == "installer" {
-			currentTag, err := r.getInstallerCurrentTag()
-			if err != nil {
-				return nil, err
-			}
-
-			releaseInfo.currentTag = currentTag
-		}
-
-		if pkg == "framework" {
-			currentTag, err := r.getFrameworkCurrentTag(r.getBranchFromTag("framework", tag))
-			if err != nil {
-				return nil, err
-			}
-
-			releaseInfo.currentTag = currentTag
-		}
-
-		pkgToReleaseInfo[pkg] = releaseInfo
+		repoToReleaseInfo[repo] = releaseInfo
 	}
 
-	return pkgToReleaseInfo, nil
+	return repoToReleaseInfo, nil
 }
 
 func (r *Release) getPackageReleaseInformation(repo string, tag string) (*ReleaseInformation, error) {
@@ -564,6 +499,24 @@ func (r *Release) getPackageReleaseInformation(repo string, tag string) (*Releas
 				tag:       tag,
 				latestTag: latestTag,
 				repo:      repo,
+			}
+
+			if repo == "installer" {
+				currentTag, err := r.getInstallerCurrentTag()
+				if err != nil {
+					return err
+				}
+
+				releaseInformation.currentTag = currentTag
+			}
+
+			if repo == "framework" {
+				currentTag, err := r.getFrameworkCurrentTag(r.getBranchFromTag("framework", tag))
+				if err != nil {
+					return err
+				}
+
+				releaseInformation.currentTag = currentTag
 			}
 
 			return nil
@@ -686,6 +639,37 @@ cd %s && git checkout master && git branch -D %s 2>/dev/null || true && git chec
 	}
 
 	return nil
+}
+
+func (r *Release) printReleaseInformation(releaseInfo *ReleaseInformation) {
+	r.divider()
+	color.Yellow().Println(fmt.Sprintf("Please check %s/%s information:", owner, releaseInfo.repo))
+	r.ctx.NewLine()
+
+	color.Black().Println(releaseInfo.notes.Name)
+	color.Black().Println(releaseInfo.notes.Body)
+
+	r.ctx.NewLine()
+
+	color.Black().Print("The latest tag is:             ")
+	color.Red().Println(releaseInfo.latestTag)
+
+	color.Black().Print("The tag to release is:         ")
+	color.Red().Println(releaseInfo.tag)
+
+	if releaseInfo.currentTag != "" {
+		color.Black().Print("The current tag in code is:    ")
+		color.Red().Println(releaseInfo.currentTag)
+
+		if releaseInfo.currentTag != releaseInfo.tag {
+			r.ctx.NewLine()
+			color.Red().Println("---------------------- WARNING ----------------------")
+			color.Red().Println("The current tag is not the same as the tag to release")
+			color.Red().Println("-----------------------------------------------------")
+		}
+	}
+
+	r.ctx.NewLine()
 }
 
 func (r *Release) refreshGoProxy() error {
@@ -881,7 +865,8 @@ func (r *Release) setDefaultBranch(repo, branch string) error {
 
 func (r *Release) testInSubPackages(branch string) error {
 	if !r.ctx.Confirm("Did you test in sub-packages?") {
-		packagesWithExample := append(packages, "example")
+		// Test example first given there is a random error when testing for a long time.
+		packagesWithExample := append([]string{"example"}, packages...)
 		for _, pkg := range packagesWithExample {
 			if err := r.testInSubPackage(pkg, branch); err != nil {
 				return err
