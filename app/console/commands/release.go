@@ -883,18 +883,18 @@ func (r *Release) testInSubPackage(pkg, branch string) error {
 	}()
 
 	packages := fmt.Sprintf("go get github.com/goravel/framework@%s && ", branch)
-	if pkg == "example" && branch == "master" {
-		packages = `go get github.com/goravel/gin@master && 
-				go get github.com/goravel/fiber@master && 
-				go get github.com/goravel/s3@master && 
-				go get github.com/goravel/oss@master && 
-				go get github.com/goravel/cos@master && 
-				go get github.com/goravel/minio@master && 
-				go get github.com/goravel/postgres@master && 
-				go get github.com/goravel/mysql@master && 
-				go get github.com/goravel/sqlserver@master && 
-				go get github.com/goravel/sqlite@master && 
-				go get github.com/goravel/redis@master && `
+	if pkg == "example" {
+		packages = fmt.Sprintf(`go get github.com/goravel/gin@%s && 
+				go get github.com/goravel/fiber@%s && 
+				go get github.com/goravel/s3@%s && 
+				go get github.com/goravel/oss@%s && 
+				go get github.com/goravel/cos@%s && 
+				go get github.com/goravel/minio@%s && 
+				go get github.com/goravel/postgres@%s && 
+				go get github.com/goravel/mysql@%s && 
+				go get github.com/goravel/sqlserver@%s && 
+				go get github.com/goravel/sqlite@%s && 
+				go get github.com/goravel/redis@%s && `, branch, branch, branch, branch, branch, branch, branch, branch, branch, branch, branch)
 	}
 
 	initCommand := fmt.Sprintf(`rm -rf %s && git clone git@github.com:goravel/%s.git && 
