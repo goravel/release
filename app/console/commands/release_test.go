@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/google/go-github/v82/github"
+	"github.com/google/go-github/v84/github"
 	"github.com/goravel/framework/contracts/console"
 	mocksconsole "github.com/goravel/framework/mocks/console"
 	mocksclient "github.com/goravel/framework/mocks/http/client"

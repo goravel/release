@@ -7,7 +7,6 @@ toolchain go1.26.1
 tool github.com/vektra/mockery/v2
 
 require (
-	github.com/google/go-github/v82 v82.0.0
 	github.com/google/go-github/v84 v84.0.0
 	github.com/goravel/framework v1.17.1
 	github.com/stretchr/testify v1.11.1

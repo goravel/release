@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/google/go-github/v82/github"
+	"github.com/google/go-github/v84/github"
 	"github.com/goravel/framework/contracts/console"
 	"github.com/goravel/framework/support/color"
 	"github.com/goravel/framework/support/convert"
@@ -897,8 +897,9 @@ func (r *Release) testInSubPackage(pkg, branch string) error {
 				go get github.com/goravel/redis@%s && `, branch, branch, branch, branch, branch, branch, branch, branch, branch, branch, branch)
 	}
 
+	// Using `-p 1` to avoid random test failure caused in example package, which may be caused by too many test cases running in parallel.
 	initCommand := fmt.Sprintf(`rm -rf %s && git clone git@github.com:goravel/%s.git && 
-				cd %s && git checkout %s && %s go mod tidy && cp .env.example .env 2>/dev/null || true && go test ./...`, pkg, pkg, pkg, branch, packages)
+				cd %s && git checkout %s && %s go mod tidy && cp .env.example .env 2>/dev/null || true && go test -p 1 ./...`, pkg, pkg, pkg, branch, packages)
 	if res := facades.Process().Run(initCommand); res.Failed() {
 		return fmt.Errorf("failed to test in %s: %w", pkg, res.Error())
 	}
