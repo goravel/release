@@ -3,7 +3,7 @@
 package services
 
 import (
-	github "github.com/google/go-github/v88/github"
+	github "github.com/google/go-github/v89/github"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -187,7 +187,7 @@ func (_c *Github_CreatePullRequest_Call) RunAndReturn(run func(string, string, *
 }
 
 // CreateRelease provides a mock function with given fields: owner, repo, release
-func (_m *Github) CreateRelease(owner string, repo string, release *github.RepositoryRelease) (*github.RepositoryRelease, error) {
+func (_m *Github) CreateRelease(owner string, repo string, release *github.CreateReleaseRequest) (*github.RepositoryRelease, error) {
 	ret := _m.Called(owner, repo, release)
 
 	if len(ret) == 0 {
@@ -196,10 +196,10 @@ func (_m *Github) CreateRelease(owner string, repo string, release *github.Repos
 
 	var r0 *github.RepositoryRelease
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string, string, *github.RepositoryRelease) (*github.RepositoryRelease, error)); ok {
+	if rf, ok := ret.Get(0).(func(string, string, *github.CreateReleaseRequest) (*github.RepositoryRelease, error)); ok {
 		return rf(owner, repo, release)
 	}
-	if rf, ok := ret.Get(0).(func(string, string, *github.RepositoryRelease) *github.RepositoryRelease); ok {
+	if rf, ok := ret.Get(0).(func(string, string, *github.CreateReleaseRequest) *github.RepositoryRelease); ok {
 		r0 = rf(owner, repo, release)
 	} else {
 		if ret.Get(0) != nil {
@@ -207,7 +207,7 @@ func (_m *Github) CreateRelease(owner string, repo string, release *github.Repos
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(string, string, *github.RepositoryRelease) error); ok {
+	if rf, ok := ret.Get(1).(func(string, string, *github.CreateReleaseRequest) error); ok {
 		r1 = rf(owner, repo, release)
 	} else {
 		r1 = ret.Error(1)
@@ -224,14 +224,14 @@ type Github_CreateRelease_Call struct {
 // CreateRelease is a helper method to define mock.On call
 //   - owner string
 //   - repo string
-//   - release *github.RepositoryRelease
+//   - release *github.CreateReleaseRequest
 func (_e *Github_Expecter) CreateRelease(owner interface{}, repo interface{}, release interface{}) *Github_CreateRelease_Call {
 	return &Github_CreateRelease_Call{Call: _e.mock.On("CreateRelease", owner, repo, release)}
 }
 
-func (_c *Github_CreateRelease_Call) Run(run func(owner string, repo string, release *github.RepositoryRelease)) *Github_CreateRelease_Call {
+func (_c *Github_CreateRelease_Call) Run(run func(owner string, repo string, release *github.CreateReleaseRequest)) *Github_CreateRelease_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string), args[2].(*github.RepositoryRelease))
+		run(args[0].(string), args[1].(string), args[2].(*github.CreateReleaseRequest))
 	})
 	return _c
 }
@@ -241,7 +241,7 @@ func (_c *Github_CreateRelease_Call) Return(_a0 *github.RepositoryRelease, _a1 e
 	return _c
 }
 
-func (_c *Github_CreateRelease_Call) RunAndReturn(run func(string, string, *github.RepositoryRelease) (*github.RepositoryRelease, error)) *Github_CreateRelease_Call {
+func (_c *Github_CreateRelease_Call) RunAndReturn(run func(string, string, *github.CreateReleaseRequest) (*github.RepositoryRelease, error)) *Github_CreateRelease_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -296,7 +296,7 @@ func (_c *Github_CreateWorkflowDispatchEvent_Call) RunAndReturn(run func(string,
 }
 
 // GenerateReleaseNotes provides a mock function with given fields: owner, repo, opts
-func (_m *Github) GenerateReleaseNotes(owner string, repo string, opts *github.GenerateNotesOptions) (*github.RepositoryReleaseNotes, error) {
+func (_m *Github) GenerateReleaseNotes(owner string, repo string, opts *github.GenerateNotesRequest) (*github.RepositoryReleaseNotes, error) {
 	ret := _m.Called(owner, repo, opts)
 
 	if len(ret) == 0 {
@@ -305,10 +305,10 @@ func (_m *Github) GenerateReleaseNotes(owner string, repo string, opts *github.G
 
 	var r0 *github.RepositoryReleaseNotes
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string, string, *github.GenerateNotesOptions) (*github.RepositoryReleaseNotes, error)); ok {
+	if rf, ok := ret.Get(0).(func(string, string, *github.GenerateNotesRequest) (*github.RepositoryReleaseNotes, error)); ok {
 		return rf(owner, repo, opts)
 	}
-	if rf, ok := ret.Get(0).(func(string, string, *github.GenerateNotesOptions) *github.RepositoryReleaseNotes); ok {
+	if rf, ok := ret.Get(0).(func(string, string, *github.GenerateNotesRequest) *github.RepositoryReleaseNotes); ok {
 		r0 = rf(owner, repo, opts)
 	} else {
 		if ret.Get(0) != nil {
@@ -316,7 +316,7 @@ func (_m *Github) GenerateReleaseNotes(owner string, repo string, opts *github.G
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(string, string, *github.GenerateNotesOptions) error); ok {
+	if rf, ok := ret.Get(1).(func(string, string, *github.GenerateNotesRequest) error); ok {
 		r1 = rf(owner, repo, opts)
 	} else {
 		r1 = ret.Error(1)
@@ -333,14 +333,14 @@ type Github_GenerateReleaseNotes_Call struct {
 // GenerateReleaseNotes is a helper method to define mock.On call
 //   - owner string
 //   - repo string
-//   - opts *github.GenerateNotesOptions
+//   - opts *github.GenerateNotesRequest
 func (_e *Github_Expecter) GenerateReleaseNotes(owner interface{}, repo interface{}, opts interface{}) *Github_GenerateReleaseNotes_Call {
 	return &Github_GenerateReleaseNotes_Call{Call: _e.mock.On("GenerateReleaseNotes", owner, repo, opts)}
 }
 
-func (_c *Github_GenerateReleaseNotes_Call) Run(run func(owner string, repo string, opts *github.GenerateNotesOptions)) *Github_GenerateReleaseNotes_Call {
+func (_c *Github_GenerateReleaseNotes_Call) Run(run func(owner string, repo string, opts *github.GenerateNotesRequest)) *Github_GenerateReleaseNotes_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string), args[2].(*github.GenerateNotesOptions))
+		run(args[0].(string), args[1].(string), args[2].(*github.GenerateNotesRequest))
 	})
 	return _c
 }
@@ -350,7 +350,7 @@ func (_c *Github_GenerateReleaseNotes_Call) Return(_a0 *github.RepositoryRelease
 	return _c
 }
 
-func (_c *Github_GenerateReleaseNotes_Call) RunAndReturn(run func(string, string, *github.GenerateNotesOptions) (*github.RepositoryReleaseNotes, error)) *Github_GenerateReleaseNotes_Call {
+func (_c *Github_GenerateReleaseNotes_Call) RunAndReturn(run func(string, string, *github.GenerateNotesRequest) (*github.RepositoryReleaseNotes, error)) *Github_GenerateReleaseNotes_Call {
 	_c.Call.Return(run)
 	return _c
 }

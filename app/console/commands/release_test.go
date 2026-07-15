@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/google/go-github/v88/github"
+	"github.com/google/go-github/v89/github"
 	"github.com/goravel/framework/contracts/console"
 	mocksconsole "github.com/goravel/framework/mocks/console"
 	mocksclient "github.com/goravel/framework/mocks/http/client"
@@ -421,8 +421,8 @@ func (s *ReleaseTestSuite) Test_createRelease() {
 			real: false,
 			setup: func() {
 				s.mockGithub.EXPECT().CheckBranchExists(owner, repo, branch).Return(true, nil).Once()
-				s.mockGithub.EXPECT().CreateRelease(owner, repo, &github.RepositoryRelease{
-					TagName:         convert.Pointer(tag),
+				s.mockGithub.EXPECT().CreateRelease(owner, repo, &github.CreateReleaseRequest{
+					TagName:         tag,
 					TargetCommitish: convert.Pointer(branch),
 					Name:            convert.Pointer(notes.Name),
 					Body:            convert.Pointer(notes.Body),
@@ -434,8 +434,8 @@ func (s *ReleaseTestSuite) Test_createRelease() {
 			real: true,
 			setup: func() {
 				s.mockGithub.EXPECT().CheckBranchExists(owner, repo, branch).Return(true, nil).Once()
-				s.mockGithub.EXPECT().CreateRelease(owner, repo, &github.RepositoryRelease{
-					TagName:         convert.Pointer(tag),
+				s.mockGithub.EXPECT().CreateRelease(owner, repo, &github.CreateReleaseRequest{
+					TagName:         tag,
 					TargetCommitish: convert.Pointer(branch),
 					Name:            convert.Pointer(notes.Name),
 					Body:            convert.Pointer(notes.Body),
@@ -447,8 +447,8 @@ func (s *ReleaseTestSuite) Test_createRelease() {
 			real: true,
 			setup: func() {
 				s.mockGithub.EXPECT().CheckBranchExists(owner, repo, branch).Return(true, nil).Once()
-				s.mockGithub.EXPECT().CreateRelease(owner, repo, &github.RepositoryRelease{
-					TagName:         convert.Pointer(tag),
+				s.mockGithub.EXPECT().CreateRelease(owner, repo, &github.CreateReleaseRequest{
+					TagName:         tag,
 					TargetCommitish: convert.Pointer(branch),
 					Name:            convert.Pointer(notes.Name),
 					Body:            convert.Pointer(notes.Body),
@@ -937,7 +937,7 @@ func (s *ReleaseTestSuite) Test_getReleases() {
 
 				for _, pkg := range allPackages {
 					s.mockGithub.EXPECT().GetLatestRelease(owner, pkg, tag).Return(&github.RepositoryRelease{
-						TagName: convert.Pointer("v1.3.0"),
+						TagName: "v1.3.0",
 						Name:    convert.Pointer(fmt.Sprintf("Release v1.3.0 for %s", pkg)),
 					}, nil).Once()
 
@@ -952,13 +952,13 @@ func (s *ReleaseTestSuite) Test_getReleases() {
 						Body: fmt.Sprintf("## What's Changed\n* Feature A for %s\n* Bug fix B for %s\n\n**Full Changelog**: https://github.com/goravel/%s/compare/v1.3.0...v1.4.0", pkg, pkg, pkg),
 					}
 					if pkg == "framework" {
-						s.mockGithub.EXPECT().GenerateReleaseNotes(owner, pkg, &github.GenerateNotesOptions{
+						s.mockGithub.EXPECT().GenerateReleaseNotes(owner, pkg, &github.GenerateNotesRequest{
 							TagName:         "v1.4.0",
 							PreviousTagName: convert.Pointer("v1.3.0"),
 							TargetCommitish: convert.Pointer("v1.4.x"),
 						}).Return(expectedNotes, nil).Once()
 					} else {
-						s.mockGithub.EXPECT().GenerateReleaseNotes(owner, pkg, &github.GenerateNotesOptions{
+						s.mockGithub.EXPECT().GenerateReleaseNotes(owner, pkg, &github.GenerateNotesRequest{
 							TagName:         "v1.4.0",
 							PreviousTagName: convert.Pointer("v1.3.0"),
 							TargetCommitish: convert.Pointer("master"),
@@ -1026,10 +1026,10 @@ const Version string = "v1.4.0"`, nil)
 
 				// installer: succeeds (runs in parallel)
 				s.mockGithub.EXPECT().GetLatestRelease(owner, "installer", tag).Return(&github.RepositoryRelease{
-					TagName: convert.Pointer("v1.3.0"),
+					TagName: "v1.3.0",
 				}, nil).Once()
 				s.mockGithub.EXPECT().CheckBranchExists(owner, "installer", branch).Return(false, nil).Once()
-				s.mockGithub.EXPECT().GenerateReleaseNotes(owner, "installer", &github.GenerateNotesOptions{
+				s.mockGithub.EXPECT().GenerateReleaseNotes(owner, "installer", &github.GenerateNotesRequest{
 					TagName:         "v1.4.0",
 					PreviousTagName: convert.Pointer("v1.3.0"),
 					TargetCommitish: convert.Pointer("master"),
@@ -1046,10 +1046,10 @@ const Version string = "v1.4.0"`, nil)
 
 				// framework: succeeds (runs in parallel)
 				s.mockGithub.EXPECT().GetLatestRelease(owner, "framework", tag).Return(&github.RepositoryRelease{
-					TagName: convert.Pointer("v1.3.0"),
+					TagName: "v1.3.0",
 				}, nil).Once()
 				s.mockGithub.EXPECT().CheckBranchExists(owner, "framework", branch).Return(true, nil).Once()
-				s.mockGithub.EXPECT().GenerateReleaseNotes(owner, "framework", &github.GenerateNotesOptions{
+				s.mockGithub.EXPECT().GenerateReleaseNotes(owner, "framework", &github.GenerateNotesRequest{
 					TagName:         "v1.4.0",
 					PreviousTagName: convert.Pointer("v1.3.0"),
 					TargetCommitish: convert.Pointer("v1.4.x"),
@@ -1092,7 +1092,7 @@ const Version string = "v1.4.0"`, nil)
 						s.mockGithub.EXPECT().GetLatestRelease(owner, pkg, tag).Return(nil, nil).Once()
 					} else {
 						s.mockGithub.EXPECT().GetLatestRelease(owner, pkg, tag).Return(&github.RepositoryRelease{
-							TagName: convert.Pointer("v1.3.0"),
+							TagName: "v1.3.0",
 						}, nil).Once()
 					}
 
@@ -1114,7 +1114,7 @@ const Version string = "v1.4.0"`, nil)
 					} else {
 						targetBranch = "master"
 					}
-					s.mockGithub.EXPECT().GenerateReleaseNotes(owner, pkg, &github.GenerateNotesOptions{
+					s.mockGithub.EXPECT().GenerateReleaseNotes(owner, pkg, &github.GenerateNotesRequest{
 						TagName:         "v1.4.0",
 						PreviousTagName: previousTag,
 						TargetCommitish: convert.Pointer(targetBranch),
@@ -1364,7 +1364,7 @@ func (s *ReleaseTestSuite) Test_generateReleaseNotes() {
 					Name: "Release v1.16.0",
 					Body: "## What's Changed\n* Feature A\n* Bug fix B\n\n**Full Changelog**: https://github.com/goravel/framework/compare/v1.15.0...v1.16.0",
 				}
-				s.mockGithub.EXPECT().GenerateReleaseNotes(owner, "framework", &github.GenerateNotesOptions{
+				s.mockGithub.EXPECT().GenerateReleaseNotes(owner, "framework", &github.GenerateNotesRequest{
 					TagName:         "v1.16.0",
 					PreviousTagName: convert.Pointer("v1.15.0"),
 					TargetCommitish: convert.Pointer(branch),
@@ -1382,7 +1382,7 @@ func (s *ReleaseTestSuite) Test_generateReleaseNotes() {
 			tagName:         "v1.16.0",
 			previousTagName: "v1.15.0",
 			setup: func() {
-				s.mockGithub.EXPECT().GenerateReleaseNotes(owner, "framework", &github.GenerateNotesOptions{
+				s.mockGithub.EXPECT().GenerateReleaseNotes(owner, "framework", &github.GenerateNotesRequest{
 					TagName:         "v1.16.0",
 					PreviousTagName: convert.Pointer("v1.15.0"),
 					TargetCommitish: convert.Pointer(branch),
@@ -1397,7 +1397,7 @@ func (s *ReleaseTestSuite) Test_generateReleaseNotes() {
 			tagName:         "v1.16.0",
 			previousTagName: "v1.15.0",
 			setup: func() {
-				s.mockGithub.EXPECT().GenerateReleaseNotes(owner, "gin", &github.GenerateNotesOptions{
+				s.mockGithub.EXPECT().GenerateReleaseNotes(owner, "gin", &github.GenerateNotesRequest{
 					TagName:         "v1.16.0",
 					PreviousTagName: convert.Pointer("v1.15.0"),
 					TargetCommitish: convert.Pointer(branch),
@@ -1435,7 +1435,7 @@ func (s *ReleaseTestSuite) Test_getLatestTag() {
 			repo: "gin",
 			setup: func() {
 				mockRelease := &github.RepositoryRelease{
-					TagName: convert.Pointer("v1.16.0"),
+					TagName: "v1.16.0",
 					Name:    convert.Pointer("Release v1.16.0"),
 					Body:    convert.Pointer("This is a test release"),
 				}
@@ -1462,32 +1462,18 @@ func (s *ReleaseTestSuite) Test_getLatestTag() {
 			wantTag: "",
 		},
 		{
-			name: "github API returns release with nil TagName",
+			name: "github API returns release with empty TagName",
 			repo: "framework",
 			setup: func() {
 				mockRelease := &github.RepositoryRelease{
-					TagName: nil,
+					TagName: "",
 					Name:    convert.Pointer("Release without tag"),
 					Body:    convert.Pointer("This release has no tag"),
 				}
 				s.mockGithub.EXPECT().GetLatestRelease(owner, "framework", tag).Return(mockRelease, nil).Once()
 			},
 			wantTag: "",
-			wantErr: fmt.Errorf("latest release tag name is nil for %s/framework", owner),
-		},
-		{
-			name: "github API returns release with empty TagName",
-			repo: "example",
-			setup: func() {
-				mockRelease := &github.RepositoryRelease{
-					TagName: convert.Pointer(""),
-					Name:    convert.Pointer("Release with empty tag"),
-					Body:    convert.Pointer("This release has empty tag"),
-				}
-				s.mockGithub.EXPECT().GetLatestRelease(owner, "example", tag).Return(mockRelease, nil).Once()
-			},
-			wantTag: "",
-			wantErr: nil,
+			wantErr: fmt.Errorf("latest release tag name is empty for %s/framework", owner),
 		},
 	}
 
@@ -1519,15 +1505,15 @@ func (s *ReleaseTestSuite) Test_isReleaseExist() {
 			setup: func() {
 				releases := []*github.RepositoryRelease{
 					{
-						TagName: convert.Pointer("v1.15.0"),
+						TagName: "v1.15.0",
 						Name:    convert.Pointer("Release v1.15.0"),
 					},
 					{
-						TagName: convert.Pointer("v1.16.0"),
+						TagName: "v1.16.0",
 						Name:    convert.Pointer("Release v1.16.0"),
 					},
 					{
-						TagName: convert.Pointer("v1.14.0"),
+						TagName: "v1.14.0",
 						Name:    convert.Pointer("Release v1.14.0"),
 					},
 				}
@@ -1546,11 +1532,11 @@ func (s *ReleaseTestSuite) Test_isReleaseExist() {
 			setup: func() {
 				releases := []*github.RepositoryRelease{
 					{
-						TagName: convert.Pointer("v1.4.0"),
+						TagName: "v1.4.0",
 						Name:    convert.Pointer("Release v1.4.0"),
 					},
 					{
-						TagName: convert.Pointer("v1.3.0"),
+						TagName: "v1.3.0",
 						Name:    convert.Pointer("Release v1.3.0"),
 					},
 				}
@@ -1595,11 +1581,11 @@ func (s *ReleaseTestSuite) Test_isReleaseExist() {
 			setup: func() {
 				releases := []*github.RepositoryRelease{
 					{
-						TagName: nil,
+						TagName: "",
 						Name:    convert.Pointer("Release without tag"),
 					},
 					{
-						TagName: convert.Pointer("v1.0.0"),
+						TagName: "v1.0.0",
 						Name:    convert.Pointer("Release v1.0.0"),
 					},
 				}
@@ -1618,7 +1604,7 @@ func (s *ReleaseTestSuite) Test_isReleaseExist() {
 			setup: func() {
 				releases := []*github.RepositoryRelease{
 					{
-						TagName: convert.Pointer("v1.0.0"),
+						TagName: "v1.0.0",
 						Name:    convert.Pointer("Release v1.0.0"),
 					},
 				}
@@ -1785,11 +1771,11 @@ func (s *ReleaseTestSuite) Test_releaseRepo() {
 					PerPage: 10,
 				}).Return([]*github.RepositoryRelease{
 					{
-						TagName: convert.Pointer("v1.15.0"),
+						TagName: "v1.15.0",
 						Name:    convert.Pointer("Release v1.15.0"),
 					},
 					{
-						TagName: convert.Pointer("v1.16.0"),
+						TagName: "v1.16.0",
 						Name:    convert.Pointer("Release v1.16.0"),
 					},
 				}, nil).Once()
@@ -1806,7 +1792,7 @@ func (s *ReleaseTestSuite) Test_releaseRepo() {
 					PerPage: 10,
 				}).Return([]*github.RepositoryRelease{
 					{
-						TagName: convert.Pointer("v1.15.0"),
+						TagName: "v1.15.0",
 						Name:    convert.Pointer("Release v1.15.0"),
 					},
 				}, nil).Once()
@@ -1814,8 +1800,8 @@ func (s *ReleaseTestSuite) Test_releaseRepo() {
 				s.mockGithub.EXPECT().CheckBranchExists(owner, repo, branch).Return(false, nil).Once()
 
 				// Mock createRelease succeeds
-				s.mockGithub.EXPECT().CreateRelease(owner, repo, &github.RepositoryRelease{
-					TagName:         convert.Pointer(tag),
+				s.mockGithub.EXPECT().CreateRelease(owner, repo, &github.CreateReleaseRequest{
+					TagName:         tag,
 					TargetCommitish: convert.Pointer("master"),
 					Name:            convert.Pointer(notes.Name),
 					Body:            convert.Pointer(notes.Body),
@@ -1844,7 +1830,7 @@ func (s *ReleaseTestSuite) Test_releaseRepo() {
 					PerPage: 10,
 				}).Return([]*github.RepositoryRelease{
 					{
-						TagName: convert.Pointer("v1.15.0"),
+						TagName: "v1.15.0",
 						Name:    convert.Pointer("Release v1.15.0"),
 					},
 				}, nil).Once()
@@ -1852,8 +1838,8 @@ func (s *ReleaseTestSuite) Test_releaseRepo() {
 				s.mockGithub.EXPECT().CheckBranchExists(owner, repo, branch).Return(false, nil).Once()
 
 				// Mock createRelease fails
-				s.mockGithub.EXPECT().CreateRelease(owner, repo, &github.RepositoryRelease{
-					TagName:         convert.Pointer(tag),
+				s.mockGithub.EXPECT().CreateRelease(owner, repo, &github.CreateReleaseRequest{
+					TagName:         tag,
 					TargetCommitish: convert.Pointer("master"),
 					Name:            convert.Pointer(notes.Name),
 					Body:            convert.Pointer(notes.Body),

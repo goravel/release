@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/google/go-github/v88/github"
+	"github.com/google/go-github/v89/github"
 	"github.com/goravel/framework/contracts/console"
 	"github.com/goravel/framework/support/color"
 	"github.com/goravel/framework/support/convert"
@@ -617,8 +617,8 @@ func (r *Release) confirmReleaseInformation(pkgToReleaseInfo map[string]*Release
 }
 
 func (r *Release) createRelease(repo, tag string, notes *github.RepositoryReleaseNotes) error {
-	_, err := r.github.CreateRelease(owner, repo, &github.RepositoryRelease{
-		TagName:         convert.Pointer(tag),
+	_, err := r.github.CreateRelease(owner, repo, &github.CreateReleaseRequest{
+		TagName:         tag,
 		TargetCommitish: convert.Pointer(r.getBranchFromTag(repo, tag)),
 		Name:            convert.Pointer(notes.Name),
 		Body:            convert.Pointer(notes.Body),
@@ -1030,7 +1030,7 @@ func (r *Release) getCurrentTag(repo, url string) (string, error) {
 }
 
 func (r *Release) generateReleaseNotes(repo, tag, previousTag, branch string) (*github.RepositoryReleaseNotes, error) {
-	notes, err := r.github.GenerateReleaseNotes(owner, repo, &github.GenerateNotesOptions{
+	notes, err := r.github.GenerateReleaseNotes(owner, repo, &github.GenerateNotesRequest{
 		TagName:         tag,
 		PreviousTagName: convert.Pointer(previousTag),
 		TargetCommitish: convert.Pointer(branch),
@@ -1055,11 +1055,11 @@ func (r *Release) getLatestTag(repo, tag string) (string, error) {
 		return "", nil
 	}
 
-	if latestRelease.TagName == nil {
-		return "", fmt.Errorf("latest release tag name is nil for %s/%s", owner, repo)
+	if latestRelease.TagName == "" {
+		return "", fmt.Errorf("latest release tag name is empty for %s/%s", owner, repo)
 	}
 
-	return *latestRelease.TagName, nil
+	return latestRelease.TagName, nil
 }
 
 func (r *Release) isReleaseExist(repo string, tag string) (bool, error) {
@@ -1072,7 +1072,7 @@ func (r *Release) isReleaseExist(repo string, tag string) (bool, error) {
 	}
 
 	for _, release := range releases {
-		if release.TagName != nil && *release.TagName == tag {
+		if release.TagName != "" && release.TagName == tag {
 			return true, nil
 		}
 	}

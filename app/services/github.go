@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/go-github/v88/github"
+	"github.com/google/go-github/v89/github"
 	"github.com/goravel/framework/support/color"
 	"github.com/goravel/framework/support/convert"
 
@@ -22,9 +22,9 @@ type Github interface {
 	// CreatePullRequest creates a new pull request
 	CreatePullRequest(owner, repo string, pr *github.NewPullRequest) (*github.PullRequest, error)
 	// CreateRelease creates a new release
-	CreateRelease(owner, repo string, release *github.RepositoryRelease) (*github.RepositoryRelease, error)
+	CreateRelease(owner, repo string, release *github.CreateReleaseRequest) (*github.RepositoryRelease, error)
 	// GenerateReleaseNotes generates release notes for a repository
-	GenerateReleaseNotes(owner, repo string, opts *github.GenerateNotesOptions) (*github.RepositoryReleaseNotes, error)
+	GenerateReleaseNotes(owner, repo string, opts *github.GenerateNotesRequest) (*github.RepositoryReleaseNotes, error)
 	// GetLatestRelease gets the latest release for a repository.
 	// If tag is provided, it will return the latest release with the same major and minor version as the tag.
 	// For example, if tag is v1.16.2, it will return the latest release with tag starting with v1.16.
@@ -133,13 +133,13 @@ func (r *GithubImpl) CreatePullRequest(owner, repo string, pr *github.NewPullReq
 	return pullRequest, nil
 }
 
-func (r *GithubImpl) CreateRelease(owner, repo string, release *github.RepositoryRelease) (*github.RepositoryRelease, error) {
+func (r *GithubImpl) CreateRelease(owner, repo string, release *github.CreateReleaseRequest) (*github.RepositoryRelease, error) {
 	if !r.real {
 		color.Yellow().Println(fmt.Sprintf("Preview mode, skip creating release for %s/%s", owner, repo))
 		return nil, nil
 	}
 
-	createdRelease, response, err := r.client.Repositories.CreateRelease(r.ctx, owner, repo, release)
+	createdRelease, response, err := r.client.Repositories.CreateRelease(r.ctx, owner, repo, *release)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create release for %s/%s: %w", owner, repo, err)
 	}
@@ -149,8 +149,8 @@ func (r *GithubImpl) CreateRelease(owner, repo string, release *github.Repositor
 	return createdRelease, nil
 }
 
-func (r *GithubImpl) GenerateReleaseNotes(owner, repo string, opts *github.GenerateNotesOptions) (*github.RepositoryReleaseNotes, error) {
-	notes, response, err := r.client.Repositories.GenerateReleaseNotes(r.ctx, owner, repo, opts)
+func (r *GithubImpl) GenerateReleaseNotes(owner, repo string, opts *github.GenerateNotesRequest) (*github.RepositoryReleaseNotes, error) {
+	notes, response, err := r.client.Repositories.GenerateReleaseNotes(r.ctx, owner, repo, *opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate release notes for %s/%s: %w", owner, repo, err)
 	}
