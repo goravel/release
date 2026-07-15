@@ -1334,12 +1334,12 @@ func (r *Release) releaseSuccess(repo, tagName string) {
 	color.Green().Println(fmt.Sprintf("Release link: https://github.com/%s/%s/releases/tag/%s", owner, repo, tagName))
 }
 
-func (r *Release) setDefaultBranch(repo, branch string) error {
-	if err := r.github.SetDefaultBranch(owner, repo, branch); err != nil {
-		return fmt.Errorf("failed to set default branch %s for %s/%s: %w", branch, owner, repo, err)
-	}
+// func (r *Release) setDefaultBranch(repo, branch string) error {
+// 	if err := r.github.SetDefaultBranch(owner, repo, branch); err != nil {
+// 		return fmt.Errorf("failed to set default branch %s for %s/%s: %w", branch, owner, repo, err)
+// 	}
 
-	color.Green().Println(fmt.Sprintf("[%s/%s] Set default branch to %s success!", owner, repo, branch))
+// 	color.Green().Println(fmt.Sprintf("[%s/%s] Set default branch to %s success!", owner, repo, branch))
 
-	return nil
-}
+// 	return nil
+// }
