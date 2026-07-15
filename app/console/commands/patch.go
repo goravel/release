@@ -37,6 +37,11 @@ func (r *Patch) Extend() command.Extend {
 				Aliases: []string{"r"},
 				Usage:   "Real release",
 			},
+			&command.StringFlag{
+				Name:    "packages",
+				Aliases: []string{"p"},
+				Usage:   "Extra packages to release, format: pkg1@version1,pkg2@version2",
+			},
 		},
 	}
 }

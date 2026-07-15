@@ -4,7 +4,7 @@ The package is used to release major and patch versions for framework and packag
 
 ## Setup
 
-Set the `GITHUB_TOKEN` environment variable in the `.env` file to your GitHub token first. Required accesses: Contents, Pull requests.
+Set the `GITHUB_TOKEN` environment variable in the `.env` file to your GitHub token first. Required Read and Write accesses: Contents, Pull requests, and Actions.
 
 Github link: https://github.com/settings/personal-access-tokens
 

@@ -3,7 +3,7 @@
 package services
 
 import (
-	github "github.com/google/go-github/v84/github"
+	github "github.com/google/go-github/v89/github"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -78,6 +78,54 @@ func (_c *Github_CheckBranchExists_Call) RunAndReturn(run func(string, string, s
 	return _c
 }
 
+// CreateBranch provides a mock function with given fields: owner, repo, branch
+func (_m *Github) CreateBranch(owner string, repo string, branch string) error {
+	ret := _m.Called(owner, repo, branch)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateBranch")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, string, string) error); ok {
+		r0 = rf(owner, repo, branch)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// Github_CreateBranch_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateBranch'
+type Github_CreateBranch_Call struct {
+	*mock.Call
+}
+
+// CreateBranch is a helper method to define mock.On call
+//   - owner string
+//   - repo string
+//   - branch string
+func (_e *Github_Expecter) CreateBranch(owner interface{}, repo interface{}, branch interface{}) *Github_CreateBranch_Call {
+	return &Github_CreateBranch_Call{Call: _e.mock.On("CreateBranch", owner, repo, branch)}
+}
+
+func (_c *Github_CreateBranch_Call) Run(run func(owner string, repo string, branch string)) *Github_CreateBranch_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *Github_CreateBranch_Call) Return(_a0 error) *Github_CreateBranch_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Github_CreateBranch_Call) RunAndReturn(run func(string, string, string) error) *Github_CreateBranch_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreatePullRequest provides a mock function with given fields: owner, repo, pr
 func (_m *Github) CreatePullRequest(owner string, repo string, pr *github.NewPullRequest) (*github.PullRequest, error) {
 	ret := _m.Called(owner, repo, pr)
@@ -139,7 +187,7 @@ func (_c *Github_CreatePullRequest_Call) RunAndReturn(run func(string, string, *
 }
 
 // CreateRelease provides a mock function with given fields: owner, repo, release
-func (_m *Github) CreateRelease(owner string, repo string, release *github.RepositoryRelease) (*github.RepositoryRelease, error) {
+func (_m *Github) CreateRelease(owner string, repo string, release *github.CreateReleaseRequest) (*github.RepositoryRelease, error) {
 	ret := _m.Called(owner, repo, release)
 
 	if len(ret) == 0 {
@@ -148,10 +196,10 @@ func (_m *Github) CreateRelease(owner string, repo string, release *github.Repos
 
 	var r0 *github.RepositoryRelease
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string, string, *github.RepositoryRelease) (*github.RepositoryRelease, error)); ok {
+	if rf, ok := ret.Get(0).(func(string, string, *github.CreateReleaseRequest) (*github.RepositoryRelease, error)); ok {
 		return rf(owner, repo, release)
 	}
-	if rf, ok := ret.Get(0).(func(string, string, *github.RepositoryRelease) *github.RepositoryRelease); ok {
+	if rf, ok := ret.Get(0).(func(string, string, *github.CreateReleaseRequest) *github.RepositoryRelease); ok {
 		r0 = rf(owner, repo, release)
 	} else {
 		if ret.Get(0) != nil {
@@ -159,7 +207,7 @@ func (_m *Github) CreateRelease(owner string, repo string, release *github.Repos
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(string, string, *github.RepositoryRelease) error); ok {
+	if rf, ok := ret.Get(1).(func(string, string, *github.CreateReleaseRequest) error); ok {
 		r1 = rf(owner, repo, release)
 	} else {
 		r1 = ret.Error(1)
@@ -176,14 +224,14 @@ type Github_CreateRelease_Call struct {
 // CreateRelease is a helper method to define mock.On call
 //   - owner string
 //   - repo string
-//   - release *github.RepositoryRelease
+//   - release *github.CreateReleaseRequest
 func (_e *Github_Expecter) CreateRelease(owner interface{}, repo interface{}, release interface{}) *Github_CreateRelease_Call {
 	return &Github_CreateRelease_Call{Call: _e.mock.On("CreateRelease", owner, repo, release)}
 }
 
-func (_c *Github_CreateRelease_Call) Run(run func(owner string, repo string, release *github.RepositoryRelease)) *Github_CreateRelease_Call {
+func (_c *Github_CreateRelease_Call) Run(run func(owner string, repo string, release *github.CreateReleaseRequest)) *Github_CreateRelease_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string), args[2].(*github.RepositoryRelease))
+		run(args[0].(string), args[1].(string), args[2].(*github.CreateReleaseRequest))
 	})
 	return _c
 }
@@ -193,13 +241,62 @@ func (_c *Github_CreateRelease_Call) Return(_a0 *github.RepositoryRelease, _a1 e
 	return _c
 }
 
-func (_c *Github_CreateRelease_Call) RunAndReturn(run func(string, string, *github.RepositoryRelease) (*github.RepositoryRelease, error)) *Github_CreateRelease_Call {
+func (_c *Github_CreateRelease_Call) RunAndReturn(run func(string, string, *github.CreateReleaseRequest) (*github.RepositoryRelease, error)) *Github_CreateRelease_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CreateWorkflowDispatchEvent provides a mock function with given fields: owner, repo, workflowFileName, ref
+func (_m *Github) CreateWorkflowDispatchEvent(owner string, repo string, workflowFileName string, ref string) error {
+	ret := _m.Called(owner, repo, workflowFileName, ref)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateWorkflowDispatchEvent")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, string, string, string) error); ok {
+		r0 = rf(owner, repo, workflowFileName, ref)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// Github_CreateWorkflowDispatchEvent_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateWorkflowDispatchEvent'
+type Github_CreateWorkflowDispatchEvent_Call struct {
+	*mock.Call
+}
+
+// CreateWorkflowDispatchEvent is a helper method to define mock.On call
+//   - owner string
+//   - repo string
+//   - workflowFileName string
+//   - ref string
+func (_e *Github_Expecter) CreateWorkflowDispatchEvent(owner interface{}, repo interface{}, workflowFileName interface{}, ref interface{}) *Github_CreateWorkflowDispatchEvent_Call {
+	return &Github_CreateWorkflowDispatchEvent_Call{Call: _e.mock.On("CreateWorkflowDispatchEvent", owner, repo, workflowFileName, ref)}
+}
+
+func (_c *Github_CreateWorkflowDispatchEvent_Call) Run(run func(owner string, repo string, workflowFileName string, ref string)) *Github_CreateWorkflowDispatchEvent_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(string), args[2].(string), args[3].(string))
+	})
+	return _c
+}
+
+func (_c *Github_CreateWorkflowDispatchEvent_Call) Return(_a0 error) *Github_CreateWorkflowDispatchEvent_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Github_CreateWorkflowDispatchEvent_Call) RunAndReturn(run func(string, string, string, string) error) *Github_CreateWorkflowDispatchEvent_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GenerateReleaseNotes provides a mock function with given fields: owner, repo, opts
-func (_m *Github) GenerateReleaseNotes(owner string, repo string, opts *github.GenerateNotesOptions) (*github.RepositoryReleaseNotes, error) {
+func (_m *Github) GenerateReleaseNotes(owner string, repo string, opts *github.GenerateNotesRequest) (*github.RepositoryReleaseNotes, error) {
 	ret := _m.Called(owner, repo, opts)
 
 	if len(ret) == 0 {
@@ -208,10 +305,10 @@ func (_m *Github) GenerateReleaseNotes(owner string, repo string, opts *github.G
 
 	var r0 *github.RepositoryReleaseNotes
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string, string, *github.GenerateNotesOptions) (*github.RepositoryReleaseNotes, error)); ok {
+	if rf, ok := ret.Get(0).(func(string, string, *github.GenerateNotesRequest) (*github.RepositoryReleaseNotes, error)); ok {
 		return rf(owner, repo, opts)
 	}
-	if rf, ok := ret.Get(0).(func(string, string, *github.GenerateNotesOptions) *github.RepositoryReleaseNotes); ok {
+	if rf, ok := ret.Get(0).(func(string, string, *github.GenerateNotesRequest) *github.RepositoryReleaseNotes); ok {
 		r0 = rf(owner, repo, opts)
 	} else {
 		if ret.Get(0) != nil {
@@ -219,7 +316,7 @@ func (_m *Github) GenerateReleaseNotes(owner string, repo string, opts *github.G
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(string, string, *github.GenerateNotesOptions) error); ok {
+	if rf, ok := ret.Get(1).(func(string, string, *github.GenerateNotesRequest) error); ok {
 		r1 = rf(owner, repo, opts)
 	} else {
 		r1 = ret.Error(1)
@@ -236,14 +333,14 @@ type Github_GenerateReleaseNotes_Call struct {
 // GenerateReleaseNotes is a helper method to define mock.On call
 //   - owner string
 //   - repo string
-//   - opts *github.GenerateNotesOptions
+//   - opts *github.GenerateNotesRequest
 func (_e *Github_Expecter) GenerateReleaseNotes(owner interface{}, repo interface{}, opts interface{}) *Github_GenerateReleaseNotes_Call {
 	return &Github_GenerateReleaseNotes_Call{Call: _e.mock.On("GenerateReleaseNotes", owner, repo, opts)}
 }
 
-func (_c *Github_GenerateReleaseNotes_Call) Run(run func(owner string, repo string, opts *github.GenerateNotesOptions)) *Github_GenerateReleaseNotes_Call {
+func (_c *Github_GenerateReleaseNotes_Call) Run(run func(owner string, repo string, opts *github.GenerateNotesRequest)) *Github_GenerateReleaseNotes_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string), args[2].(*github.GenerateNotesOptions))
+		run(args[0].(string), args[1].(string), args[2].(*github.GenerateNotesRequest))
 	})
 	return _c
 }
@@ -253,7 +350,127 @@ func (_c *Github_GenerateReleaseNotes_Call) Return(_a0 *github.RepositoryRelease
 	return _c
 }
 
-func (_c *Github_GenerateReleaseNotes_Call) RunAndReturn(run func(string, string, *github.GenerateNotesOptions) (*github.RepositoryReleaseNotes, error)) *Github_GenerateReleaseNotes_Call {
+func (_c *Github_GenerateReleaseNotes_Call) RunAndReturn(run func(string, string, *github.GenerateNotesRequest) (*github.RepositoryReleaseNotes, error)) *Github_GenerateReleaseNotes_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetCheckRunsForRef provides a mock function with given fields: owner, repo, ref
+func (_m *Github) GetCheckRunsForRef(owner string, repo string, ref string) ([]*github.CheckRun, error) {
+	ret := _m.Called(owner, repo, ref)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetCheckRunsForRef")
+	}
+
+	var r0 []*github.CheckRun
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string, string, string) ([]*github.CheckRun, error)); ok {
+		return rf(owner, repo, ref)
+	}
+	if rf, ok := ret.Get(0).(func(string, string, string) []*github.CheckRun); ok {
+		r0 = rf(owner, repo, ref)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*github.CheckRun)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(string, string, string) error); ok {
+		r1 = rf(owner, repo, ref)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// Github_GetCheckRunsForRef_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetCheckRunsForRef'
+type Github_GetCheckRunsForRef_Call struct {
+	*mock.Call
+}
+
+// GetCheckRunsForRef is a helper method to define mock.On call
+//   - owner string
+//   - repo string
+//   - ref string
+func (_e *Github_Expecter) GetCheckRunsForRef(owner interface{}, repo interface{}, ref interface{}) *Github_GetCheckRunsForRef_Call {
+	return &Github_GetCheckRunsForRef_Call{Call: _e.mock.On("GetCheckRunsForRef", owner, repo, ref)}
+}
+
+func (_c *Github_GetCheckRunsForRef_Call) Run(run func(owner string, repo string, ref string)) *Github_GetCheckRunsForRef_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *Github_GetCheckRunsForRef_Call) Return(_a0 []*github.CheckRun, _a1 error) *Github_GetCheckRunsForRef_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *Github_GetCheckRunsForRef_Call) RunAndReturn(run func(string, string, string) ([]*github.CheckRun, error)) *Github_GetCheckRunsForRef_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetCombinedStatus provides a mock function with given fields: owner, repo, ref
+func (_m *Github) GetCombinedStatus(owner string, repo string, ref string) (*github.CombinedStatus, error) {
+	ret := _m.Called(owner, repo, ref)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetCombinedStatus")
+	}
+
+	var r0 *github.CombinedStatus
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string, string, string) (*github.CombinedStatus, error)); ok {
+		return rf(owner, repo, ref)
+	}
+	if rf, ok := ret.Get(0).(func(string, string, string) *github.CombinedStatus); ok {
+		r0 = rf(owner, repo, ref)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*github.CombinedStatus)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(string, string, string) error); ok {
+		r1 = rf(owner, repo, ref)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// Github_GetCombinedStatus_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetCombinedStatus'
+type Github_GetCombinedStatus_Call struct {
+	*mock.Call
+}
+
+// GetCombinedStatus is a helper method to define mock.On call
+//   - owner string
+//   - repo string
+//   - ref string
+func (_e *Github_Expecter) GetCombinedStatus(owner interface{}, repo interface{}, ref interface{}) *Github_GetCombinedStatus_Call {
+	return &Github_GetCombinedStatus_Call{Call: _e.mock.On("GetCombinedStatus", owner, repo, ref)}
+}
+
+func (_c *Github_GetCombinedStatus_Call) Run(run func(owner string, repo string, ref string)) *Github_GetCombinedStatus_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *Github_GetCombinedStatus_Call) Return(_a0 *github.CombinedStatus, _a1 error) *Github_GetCombinedStatus_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *Github_GetCombinedStatus_Call) RunAndReturn(run func(string, string, string) (*github.CombinedStatus, error)) *Github_GetCombinedStatus_Call {
 	_c.Call.Return(run)
 	return _c
 }
