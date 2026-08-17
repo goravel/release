@@ -2,13 +2,12 @@ module goravel
 
 go 1.25.5
 
-toolchain go1.26.5
+toolchain go1.26.6
 
 tool github.com/vektra/mockery/v2
 
 require (
 	github.com/google/go-github/v89 v89.0.0
-	github.com/google/go-github/v90 v90.0.0
 	github.com/goravel/framework v1.18.0
 	github.com/stretchr/testify v1.11.1
 )
@@ -90,7 +89,7 @@ require (
 	github.com/stretchr/objx v0.5.3 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/urfave/cli/v3 v3.10.1 // indirect
-	github.com/vektra/mockery/v3 v3.7.1 // indirect
+	github.com/vektra/mockery/v2 v2.53.5 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	github.com/xrash/smetrics v0.0.0-20250705151800-55b8f293f342 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
