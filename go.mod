@@ -1,6 +1,6 @@
 module goravel
 
-go 1.25.5
+go 1.26.0
 
 toolchain go1.27.0
 
@@ -9,6 +9,7 @@ tool github.com/vektra/mockery/v2
 require (
 	github.com/google/go-github/v89 v89.0.0
 	github.com/google/go-github/v90 v90.0.0
+	github.com/google/go-github/v91 v91.0.0
 	github.com/goravel/framework v1.18.0
 	github.com/stretchr/testify v1.12.1
 )
